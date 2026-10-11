@@ -15,9 +15,21 @@
 - Design tokens: `docs/design.md`
 - Training plan architecture: `docs/training_plan_architecture.md`
 - Flutter rules: `docs/flutter_rules.md`
-- Issue tracker: `docs/agents/issue_tracker.md`
-- Triage labels: `docs/agents/triage_labels.md`
 - Domain docs: `GLOSSARY.md` and `docs/adr/`
+
+## Agent skills
+
+### Issue tracker
+
+Local markdown files in `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical roles (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`GLOSSARY.md` and `docs/adr/`). See `docs/agents/domain.md`.
 
 ## GitHub Automation
 
