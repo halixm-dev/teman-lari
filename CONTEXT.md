@@ -12,3 +12,35 @@
 - **Form (TSB)**: Training Stress Balance. The difference between Fitness and Fatigue. Positive values indicate freshness, negative values indicate fatigue.
 - **Seam**: The interface between modules where behavior can be altered.
 - **Adapter**: A concrete implementation satisfying an interface at a seam.
+- **Fueling Strategy**: Prescriptive nutritional guidance attached to a `TrainingDay` specifying carbohydrate, fluid, and electrolyte targets across the fueling window.
+- **Fueling Window**: The three temporal phases of workout nutrition: Pre-Run priming (1–3h prior), Intra-Run fueling/hydration, and Post-Run recovery (within 60m).
+- **Gut Training**: A periodized progression of intra-run carbohydrate intake on long runs (ramping up to 60–90g/hr) to upregulate intestinal transporters before race day.
+- **Rehab Feedback**: Subjective post-activity data submitted by the runner, recording immediate and morning-after pain levels (VAS 0–10), morning stiffness presence, and affected anatomical location.
+- **Rehab Status**: The current physiological tolerance state (`pass`, `warning`, `flareUp`) computed from recent `RehabFeedback`, dictating volume gating and session advancement in `ReturnPlanStrategy`.
+- **VAS (Visual Analog Scale)**: A standardized 0–10 rating measuring subjective tissue discomfort, where $\le 3$ indicates acceptable tissue load.
+- **Dual-Window Check-in**: A protocol evaluating musculoskeletal irritability both immediately following an activity and 24 hours later (the subsequent morning) to verify overnight recovery.
+- **Injury Site**: The anatomical location under rehabilitation (e.g., Achilles, Knee, Shin, Plantar Fascia, Hamstring).
+- **Grade Adjusted Pace (GAP)**: The equivalent flat-surface running pace for an uphill or downhill effort, adjusted using biomechanical metabolic expenditure models.
+- **Minetti Equation**: A 5th-order metabolic cost polynomial calculating the energetic cost of human running as a function of fractional terrain gradient.
+- **Environmental De-rating Factor**: A percentage multiplier slowing prescriptive pace targets to preserve the intended cardiovascular heart rate zone under elevated heat and humidity.
+- **Thermal Stress Index**: The arithmetic sum of ambient temperature and dew point, grouped into stepped physiological brackets governing the Environmental De-rating Factor.
+- **Companion Strength Workout**: A resistance training session scheduled alongside or on the same calendar date as a running session, governed by intra-day recovery windows.
+- **Concurrent Interference Effect**: The competing physiological adaptations (AMPK vs. mTOR) and eccentric muscle damage arising when high-volume endurance and heavy resistance training are scheduled without adequate separation.
+- **Hard Days Hard Rule**: The training principle of pairing high-stress sessions (Intervals AM + Lifting PM) on the same day to ensure designated easy/recovery days remain completely free of heavy neuromuscular fatigue.
+- **Strength Archetype**: Distinct movement categories for runners (Neuromuscular Max Strength, Runner Prehab & Durability, and Mobility/Recovery).
+- **Strength Taper**: Systematic 50% reduction in lifting volume during running deload and race taper weeks to promote glycogen supercompensation and soft-tissue recovery.
+- **Mesocycle Phase**: Multi-week running training blocks (beginner, base building, intermediate, advanced, returning) governing training volume and periodization.
+- **Menstrual Phase**: The biological endocrine state of the female cycle (earlyFollicular, midLateFollicular, ovulatory, midLateLuteal).
+- **Hormonal Training Periodization**: The systematic alignment of high-intensity running and strength loads with high-estrogen follicular phases, paired with expanded recovery buffers in the high-progesterone luteal phase.
+- **Luteal Phase Recovery Adjustment**: Automatic adjustments in the late luteal phase that expand workout recovery spacing, bias volume toward Zone 1 aerobic runs, and scale up sodium and protein fueling targets.
+- **Shoe Equipment Entity**: The domain representation of a running shoe, enriched with functional category, foam chemistry, cumulative distance, and compression state.
+- **Foam Rebound Window**: The 24–48 hour physiological recovery window required for midsole foam cells to mechanically decompress and restore shock attenuation after a run.
+- **Super-foam (PEBA vs. EVA)**: Distinct midsole formulations where polyether block amide (PEBA) provides higher energy return but degrades non-linearly (350–450 km), compared to more resilient but firmer ethylene-vinyl acetate (EVA, 600–800 km).
+- **Shoe Rotation Quiver**: The user's active set of shoes across distinct categories (Daily Trainer, Recovery Cushion, Tempo/Speed, Race Plated) alternated to vary musculoskeletal loading.
+- **Performance Degradation Threshold**: The point in a super-shoe's lifespan (typically ~300 km) where energy return drops noticeably, warranting retirement from priority racing to training use.
+- **Local Profile / Guest Mode**: The default offline identity state where athlete demographics, logs, and plans are stored entirely on-device without an account requirement.
+- **Single Source of Truth (SSOT) Local Store**: The un-expiring on-device database (Hive) housing all activities, streams, and plan state.
+- **Manual Activity**: A run entered directly by the athlete via user input rather than imported from an external service or recorded via GPS.
+- **Selective Push**: The user-initiated action of uploading an offline-recorded run to an external provider (Strava).
+- **Snapshot Backup**: A self-contained, versioned data export bundling local profile, activities, streams, and equipment records into a serialized payload.
+- **Smart Merge**: An import reconciliation strategy that performs an additive union on activities, matching on unique identifiers to prevent duplicates without overwriting unassociated records.
