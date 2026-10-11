@@ -13,7 +13,7 @@ class StravaAuthDataSource {
 
   Future<StravaTokens> authenticate() async {
     final redirectUri = kIsWeb
-        ? (kDebugMode ? Uri.base.origin : 'https://temanlari.vercel.app')
+        ? (kDebugMode ? Uri.base.origin : 'https://temanlari.halixm.dev')
         : ApiConstants.stravaRedirectUri;
     final callbackScheme = kIsWeb ? 'http' : 'dev.halixm.temanlari';
 

@@ -17,7 +17,7 @@
 - Flutter rules: `docs/flutter_rules.md`
 - Issue tracker: `docs/agents/issue_tracker.md`
 - Triage labels: `docs/agents/triage_labels.md`
-- Domain docs: `CONTEXT.md` and `docs/adr/`
+- Domain docs: `GLOSSARY.md` and `docs/adr/`
 
 ## GitHub Automation
 

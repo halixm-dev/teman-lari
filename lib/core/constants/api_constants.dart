@@ -9,7 +9,7 @@ class ApiConstants {
   );
   static const String stravaRedirectUri = String.fromEnvironment(
     'STRAVA_REDIRECT_URI',
-    defaultValue: 'dev.halixm.temanlari://temanlari.vercel.app',
+    defaultValue: 'dev.halixm.temanlari://temanlari.halixm.dev',
   );
 
   static const String stravaAccessToken = String.fromEnvironment(
