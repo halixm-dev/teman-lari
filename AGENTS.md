@@ -2,9 +2,8 @@
 
 ## Tooling
 
-- Token Optimizer (RTK): ALWAYS prefix commands with `rtk` (e.g. `rtk git status`)
 - Codegen: `dart run build_runner build --delete-conflicting-outputs`
-- Formatting: ALWAYS run `rtk dart format .` before committing code.
+- Formatting: ALWAYS run `dart format .` before committing code.
 
 ## Non-Obvious Rules
 

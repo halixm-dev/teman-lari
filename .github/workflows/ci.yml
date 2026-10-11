@@ -31,7 +31,7 @@ jobs:
         run: flutter test --coverage
 
   build:
-    name: Build APK
+    name: Build Android Artifacts
     needs: quality_gate
     runs-on: ubuntu-latest
     steps:
@@ -55,11 +55,38 @@ jobs:
           }
           EOF
 
+      - name: Configure Keystore
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build App Bundle (AAB for Google Play)
+        run: flutter build appbundle --flavor prod --dart-define-from-file=config/prod.json --release
+
       - name: Build APK
         run: flutter build apk --flavor prod --dart-define-from-file=config/prod.json --release
         
+      - name: Upload Release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-prod-release.apk
+
