@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:http/http.dart' as http;
 import '../../data/datasources/strava_auth_datasource.dart';
 import '../../data/datasources/token_storage.dart';
+import '../errors/error_formatter.dart';
 import '../errors/exceptions.dart';
 import 'rate_limiter.dart';
 
@@ -114,7 +115,11 @@ class StravaApiClient {
       }
     }
 
-    throw StravaApiException(response.statusCode, response.body);
+    final formattedMessage = AppErrorFormatter.formatMessage(
+      response.body,
+      statusCode: response.statusCode,
+    );
+    throw StravaApiException(response.statusCode, formattedMessage);
   }
 
   Future<void> _forceRefreshToken() {
