@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/errors/error_formatter.dart';
 import '../../providers/activities_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/preferences_provider.dart';
@@ -334,7 +335,9 @@ class _StravaIntegrationCardState extends ConsumerState<StravaIntegrationCard> {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Sync failed: $e'),
+                                    content: Text(
+                                      'Sync failed: ${AppErrorFormatter.format(e)}',
+                                    ),
                                     duration: const Duration(seconds: 3),
                                   ),
                                 );

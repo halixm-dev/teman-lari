@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:teman_lari/core/errors/failures.dart';
 import 'package:teman_lari/domain/entities/activity.dart';
 import 'package:teman_lari/presentation/providers/activities_provider.dart';
 import 'package:teman_lari/presentation/providers/auth_provider.dart';
@@ -32,6 +33,7 @@ class TestAuthNotifier extends AuthNotifier {
 
 class ActivitiesTracker {
   bool refreshCalled = false;
+  Object? errorToThrow;
 }
 
 class TestActivitiesNotifier extends ActivitiesNotifier {
@@ -50,6 +52,9 @@ class TestActivitiesNotifier extends ActivitiesNotifier {
   @override
   Future<void> syncWithStrava() async {
     tracker.refreshCalled = true;
+    if (tracker.errorToThrow != null) {
+      throw tracker.errorToThrow!;
+    }
   }
 }
 
@@ -287,5 +292,49 @@ void main() {
       expect(find.text('Network timeout during OAuth'), findsOneWidget);
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
+
+    testWidgets(
+      'CARD_W06: Sync failure with Strava Inactive Application error presents user-friendly message without raw JSON',
+      (tester) async {
+        final authNotifier = TestAuthNotifier(
+          initialAuthState: const AuthState.authenticated(),
+        );
+        final tracker = ActivitiesTracker()
+          ..errorToThrow = const ServerFailure(
+            '{"message":"Forbidden","errors":[{"resource":"Application","field":"Status","code":"Inactive"}]}',
+            403,
+          );
+
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              authProvider.overrideWith(() => authNotifier),
+              athleteNameProvider.overrideWith(
+                (ref) => Future.value('Budi Santoso'),
+              ),
+              activitiesProvider.overrideWith(
+                () => TestActivitiesNotifier(tracker),
+              ),
+            ],
+            child: const MaterialApp(
+              home: Scaffold(body: StravaIntegrationCard()),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final syncBtnFinder = find.byKey(const ValueKey('sync_strava_button'));
+        await tester.tap(syncBtnFinder);
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('{"message":"Forbidden"'), findsNothing);
+        expect(
+          find.text(
+            'Sync failed: Strava application is inactive. Please check your Strava developer settings.',
+          ),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }

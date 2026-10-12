@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/errors/error_formatter.dart';
 import '../../core/utils/date_utils.dart';
 import '../../domain/entities/activity.dart';
 import '../../domain/entities/analyzed_activity.dart';
@@ -40,7 +41,7 @@ class _CompactActivityCardState extends ConsumerState<CompactActivityCard> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Upload failed: $e'),
+            content: Text('Upload failed: ${AppErrorFormatter.format(e)}'),
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
               label: 'Retry',
