@@ -1,6 +1,6 @@
 # Spec: Lightweight First-Launch Onboarding Flow
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
