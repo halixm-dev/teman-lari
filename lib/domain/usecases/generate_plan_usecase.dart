@@ -36,6 +36,7 @@ class GeneratePlanUseCase {
     int weekInCycle = -1,
     int? userMaxHr,
     int? userRestingHr,
+    int? userThresholdPaceSeconds,
   }) {
     if (activities.isEmpty) return TrainingPlan.empty();
 
@@ -43,9 +44,14 @@ class GeneratePlanUseCase {
       activities,
       userMaxHr: userMaxHr,
       userRestingHr: userRestingHr,
+      userThresholdPace: userThresholdPaceSeconds != null
+          ? Duration(seconds: userThresholdPaceSeconds)
+          : null,
       config: config,
     );
-    final thresholdPace = PaceZoneCalculator.estimateThresholdPace(activities);
+    final thresholdPace =
+        userThresholdPaceSeconds ??
+        PaceZoneCalculator.estimateThresholdPace(activities);
     final paceZones = PaceZoneCalculator.fromThresholdPace(thresholdPace);
     final hrZones = HrZoneCalculator.fromActivities(
       activities,

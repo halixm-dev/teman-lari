@@ -17,6 +17,7 @@ class Activity {
   final int? sufferScore;
   final TrainingLoad trainingLoad;
   final List<double>? heartRateData;
+  final bool? _isLocal;
 
   const Activity({
     required this.id,
@@ -33,7 +34,11 @@ class Activity {
     this.avgCadence,
     this.sufferScore,
     this.heartRateData,
-  });
+    bool? isLocal,
+  }) : _isLocal = isLocal;
+
+  bool get isLocal => _isLocal ?? (id < 0);
+  String get syncStatusLabel => isLocal ? 'Local' : 'Strava';
 
   String get paceString {
     final totalSeconds = pace.inSeconds;

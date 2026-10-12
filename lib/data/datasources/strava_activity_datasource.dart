@@ -57,4 +57,29 @@ class StravaActivityDataSource {
     final data = await _client.get('athlete');
     return AthleteModel.fromJson(data);
   }
+
+  Future<ActivityModel> createActivity({
+    required String name,
+    required String type,
+    required String startDateLocal,
+    required int elapsedTime,
+    double? distance,
+    String? description,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'type': type,
+      'sport_type': type,
+      'start_date_local': startDateLocal,
+      'elapsed_time': elapsedTime,
+    };
+    if (distance != null) {
+      body['distance'] = distance;
+    }
+    if (description != null) {
+      body['description'] = description;
+    }
+    final data = await _client.post('activities', body: body);
+    return ActivityModel.fromJson(data);
+  }
 }

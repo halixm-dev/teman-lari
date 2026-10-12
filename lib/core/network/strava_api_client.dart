@@ -56,6 +56,29 @@ class StravaApiClient {
     return jsonDecode(response.body) as List;
   }
 
+  Future<Map<String, dynamic>> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    log('Strava API POST: $endpoint', name: 'StravaApiClient');
+    await _rateLimiter.checkAndWait();
+    final response = await _requestWithRetry(() async {
+      final token = await _getValidToken();
+      final uri = Uri.https('www.strava.com', '/api/v3/$endpoint');
+
+      return await _httpClient.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body ?? {}),
+      );
+    });
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<http.Response> _requestWithRetry(
     Future<http.Response> Function() request,
   ) async {
@@ -79,7 +102,7 @@ class StravaApiClient {
       response = await request();
     }
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       return response;
     }
 

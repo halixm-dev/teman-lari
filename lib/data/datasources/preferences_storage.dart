@@ -12,6 +12,11 @@ class HrPreferences {
     this.age,
     this.thresholdPaceSeconds,
   });
+
+  int get effectiveMaxHr => maxHr ?? (age != null ? (220 - age!) : 190);
+  Duration? get thresholdPace => thresholdPaceSeconds != null
+      ? Duration(seconds: thresholdPaceSeconds!)
+      : null;
 }
 
 class PreferencesStorage {
@@ -24,6 +29,12 @@ class PreferencesStorage {
   static const _keyCycleStartDate = 'cycle_start_date';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  Future<int> getRestingHr() async =>
+      (await _prefs).getInt(_keyRestingHr) ?? 60;
+  Future<int?> getMaxHr() async => (await _prefs).getInt(_keyMaxHr);
+  Future<int?> getThresholdPace() async =>
+      (await _prefs).getInt(_keyThresholdPace);
 
   Future<HrPreferences> getPreferences() async {
     final prefs = await _prefs;
@@ -79,24 +90,32 @@ class PreferencesStorage {
     final prefs = await _prefs;
     bool changed = false;
 
-    final candidateMaxHr = _pickBestMaxHr(
-      stored: prefs.getInt(_keyMaxHr),
-      activityMaxHr: activityMaxHr,
-      athleteMaxHr: athleteMaxHr,
-    );
-    if (candidateMaxHr != null && candidateMaxHr != prefs.getInt(_keyMaxHr)) {
-      await prefs.setInt(_keyMaxHr, candidateMaxHr);
+    final storedMaxHr = prefs.getInt(_keyMaxHr);
+    if (storedMaxHr == null) {
+      final candidateMaxHr = _pickBestMaxHr(
+        stored: null,
+        activityMaxHr: activityMaxHr,
+        athleteMaxHr: athleteMaxHr,
+      );
+      if (candidateMaxHr != null) {
+        await prefs.setInt(_keyMaxHr, candidateMaxHr);
+        changed = true;
+      }
+    } else if (activityMaxHr != null && activityMaxHr > storedMaxHr) {
+      await prefs.setInt(_keyMaxHr, activityMaxHr);
       changed = true;
     }
 
     final storedDob = prefs.getString(_keyDateOfBirth);
-    if (athleteDateOfBirth != null && storedDob != athleteDateOfBirth) {
+    if (storedDob == null && athleteDateOfBirth != null) {
       await prefs.setString(_keyDateOfBirth, athleteDateOfBirth);
       changed = true;
     }
 
-    if (athleteName != null &&
-        prefs.getString(_keyAthleteName) != athleteName) {
+    final storedName = prefs.getString(_keyAthleteName);
+    if ((storedName == null || storedName.isEmpty) &&
+        athleteName != null &&
+        athleteName.isNotEmpty) {
       await prefs.setString(_keyAthleteName, athleteName);
       changed = true;
     }

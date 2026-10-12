@@ -56,9 +56,9 @@ class AnalyzeRunsUseCase {
 
     final returnCtx = _returnDetector.detect(sortedRunning, cfg);
 
-    final thresholdPace = PaceZoneCalculator.estimateThresholdPace(
-      runningActivities,
-    );
+    final thresholdPace =
+        userThresholdPace?.inSeconds ??
+        PaceZoneCalculator.estimateThresholdPace(runningActivities);
     final easyLike =
         sortedRunning
             .where(

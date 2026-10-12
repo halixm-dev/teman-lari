@@ -62,7 +62,8 @@ class TrainingPlan {
       startDate: DateTime.now(),
       days: [],
       goal: 'No data available',
-      description: 'Connect Strava and complete some runs to generate a plan.',
+      description:
+          'Track or log runs to generate your personalized training plan.',
       weekInCycle: -1,
       cyclePhase: CyclePhase.beginner,
     );
