@@ -110,7 +110,7 @@ void main() {
     );
 
     testWidgets(
-      'Tapping Get Started on OnboardingScreen writes has_completed_onboarding: true and navigates to /dashboard',
+      'Advancing through OnboardingScreen and completing setup writes has_completed_onboarding: true and navigates to /dashboard',
       (WidgetTester tester) async {
         final fakeTokenStorage = FakeTokenStorage();
 
@@ -129,7 +129,11 @@ void main() {
 
         expect(find.byType(OnboardingScreen), findsOneWidget);
 
-        // Tap Get Started
+        // Tap Get Started to advance from Step 1 to Step 2
+        await tester.tap(find.byKey(const ValueKey('get_started_button')));
+        await tester.pumpAndSettle();
+
+        // Tap Complete Setup on Step 2
         await tester.tap(
           find.byKey(const ValueKey('complete_onboarding_button')),
         );
