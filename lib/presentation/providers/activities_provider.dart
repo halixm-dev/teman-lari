@@ -172,6 +172,8 @@ Future<RunningStats?> runningStats(Ref ref) async {
         avgCadence: a.avgCadence,
         sufferScore: a.sufferScore,
         heartRateData: hrData,
+        perceivedExertion: a.perceivedExertion,
+        isLocal: a.isLocal,
       );
     }).toList();
   } else {

@@ -19,7 +19,7 @@ class TrainingLoadCalculator {
       final day = DateTime(localDate.year, localDate.month, localDate.day);
       final double dailyTss =
           (tssByDate[day] ?? 0) +
-          _trainingStressScore(
+          calculateTss(
             a,
             maxHr: maxHr,
             restingHr: restingHr,
@@ -58,6 +58,29 @@ class TrainingLoadCalculator {
     return result;
   }
 
+  /// Calculates Training Stress Score (TSS) for an activity.
+  ///
+  /// Precedence:
+  /// 1. Heart rate reserve formula if [activity.avgHeartRate] is present.
+  /// 2. Perceived exertion (RPE) estimation fallback if [activity.perceivedExertion] is present.
+  /// 3. Threshold pace intensity factor if [thresholdPace] is present and [activity.pace] > 0.
+  /// 4. Duration-based fallback: moving minutes * 0.83.
+  ///
+  /// Clamped to a maximum of 400.0.
+  double calculateTss(
+    Activity activity, {
+    required int maxHr,
+    required int restingHr,
+    Duration? thresholdPace,
+  }) {
+    return _trainingStressScore(
+      activity,
+      maxHr: maxHr,
+      restingHr: restingHr,
+      thresholdPace: thresholdPace,
+    );
+  }
+
   double _trainingStressScore(
     Activity activity, {
     required int maxHr,
@@ -65,14 +88,18 @@ class TrainingLoadCalculator {
     Duration? thresholdPace,
   }) {
     final hr = activity.avgHeartRate;
-    final durationHours = activity.movingTime.inMinutes / 60.0;
+    final durationHours = activity.movingTime.inSeconds / 3600.0;
     double tss = 0.0;
 
     if (hr != null) {
-      final hrReserve = (hr - restingHr) / (maxHr - restingHr);
-      final thresholdHrReserve = 0.85;
+      final hrr = maxHr - restingHr;
+      final hrReserve = hrr > 0 ? (hr - restingHr) / hrr : 0.0;
+      const thresholdHrReserve = 0.85;
       final intensityFactor = hrReserve / thresholdHrReserve;
       tss = intensityFactor * intensityFactor * durationHours * 100;
+    } else if (activity.perceivedExertion != null) {
+      final rpe = activity.perceivedExertion!;
+      tss = durationHours * (rpe / 10.0) * (rpe / 10.0) * 100.0;
     } else if (thresholdPace != null && activity.pace.inSeconds > 0) {
       double ifPace = thresholdPace.inSeconds / activity.pace.inSeconds;
       if (ifPace > 1.5) ifPace = 1.5;
@@ -112,7 +139,7 @@ class TrainingLoadCalculator {
     for (final a in sortedActivities) {
       final daysAgo = now.difference(a.date).inDays;
       if (daysAgo < 28 && daysAgo >= 0) {
-        final tss = _trainingStressScore(
+        final tss = calculateTss(
           a,
           maxHr: maxHr,
           restingHr: restingHr,
