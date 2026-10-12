@@ -84,6 +84,3 @@ class HrPreferencesNotifier extends _$HrPreferencesNotifier {
 Future<String?> athleteName(Ref ref) async {
   return ref.read(preferencesStorageProvider).getAthleteName();
 }
-
-/// Alias for [hrPreferencesProvider] to support explicit notifier naming conventions.
-final hrPreferencesNotifierProvider = hrPreferencesProvider;

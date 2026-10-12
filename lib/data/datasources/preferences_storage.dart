@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/usecases/demographics_calculator.dart';
+
 class HrPreferences {
   final int? maxHr;
   final int restingHr;
@@ -32,18 +34,12 @@ class PreferencesStorage {
   /// Calculates estimated Maximum Heart Rate using the clinically validated Tanaka formula:
   /// HR_max = round(208 - 0.7 * age)
   static int calculateTanakaMaxHr(int age) {
-    return (208 - 0.7 * age).round();
+    return DemographicsCalculator.calculateTanakaMaxHr(age);
   }
 
   /// Calculates elapsed age in years from birth date given an optional reference date.
   static int calculateAge(DateTime birthDate, [DateTime? referenceDate]) {
-    final now = referenceDate ?? DateTime.now();
-    var age = now.year - birthDate.year;
-    if (now.month < birthDate.month ||
-        (now.month == birthDate.month && now.day < birthDate.day)) {
-      age--;
-    }
-    return age;
+    return DemographicsCalculator.calculateAge(birthDate, referenceDate);
   }
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
@@ -202,7 +198,11 @@ class PreferencesStorage {
   int? _computeAge(String? dateOfBirth) {
     if (dateOfBirth == null) return null;
     final parts = dateOfBirth.split('-');
-    if (parts.length != 3) return null;
+    if (parts.length != 3) {
+      final directAge = int.tryParse(dateOfBirth);
+      if (directAge != null) return directAge;
+      return null;
+    }
     final year = int.tryParse(parts[0]);
     final month = int.tryParse(parts[1]);
     final day = int.tryParse(parts[2]);

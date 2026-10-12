@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/responsive.dart';
-import '../../data/datasources/preferences_storage.dart';
+import '../../domain/usecases/demographics_calculator.dart';
 import '../providers/core_provider.dart';
 import '../providers/preferences_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
 
 /// Two-step onboarding flow screen shown exclusively on first launch.
 ///
@@ -26,22 +27,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
   String? _dobError;
   int? _estimatedAge;
   int? _estimatedMaxHr;
+  bool _isSyncingAge = false;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _dobController.addListener(_onDobChanged);
+    _ageController.addListener(_onAgeChanged);
   }
 
   @override
   void dispose() {
     _dobController.removeListener(_onDobChanged);
+    _ageController.removeListener(_onAgeChanged);
     _nameController.dispose();
     _dobController.dispose();
+    _ageController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -55,23 +61,86 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
+  void _clearDobState() {
+    if (_dobError != null || _estimatedMaxHr != null || _estimatedAge != null) {
+      setState(() {
+        _dobError = null;
+        _estimatedAge = null;
+        _estimatedMaxHr = null;
+      });
+    }
+  }
+
+  void _handleDirectAge(int age) {
+    if (age < 5 || age > 120) {
+      setState(() {
+        _dobError = 'Age must be between 5 and 120 years';
+        _estimatedAge = null;
+        _estimatedMaxHr = null;
+      });
+      return;
+    }
+    final maxHr = DemographicsCalculator.calculateTanakaMaxHr(age);
+    setState(() {
+      _dobError = null;
+      _estimatedAge = age;
+      _estimatedMaxHr = maxHr;
+    });
+  }
+
   void _onDobChanged() {
+    if (_isSyncingAge) return;
     final text = _dobController.text.trim();
     if (text.isEmpty) {
-      if (_dobError != null ||
-          _estimatedMaxHr != null ||
-          _estimatedAge != null) {
-        setState(() {
-          _dobError = null;
-          _estimatedAge = null;
-          _estimatedMaxHr = null;
-        });
+      if (_ageController.text.isEmpty) {
+        _clearDobState();
       }
       return;
     }
 
-    final match = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(text);
-    if (match == null) {
+    final directAge = int.tryParse(text);
+    if (directAge != null) {
+      _handleDirectAge(directAge);
+      _syncAgeController(text);
+      return;
+    }
+
+    _handleDateString(text);
+  }
+
+  void _onAgeChanged() {
+    if (_isSyncingAge) return;
+    final text = _ageController.text.trim();
+    if (text.isEmpty) {
+      if (_dobController.text.isEmpty) {
+        _clearDobState();
+      }
+      return;
+    }
+
+    final age = int.tryParse(text);
+    if (age == null) {
+      setState(() {
+        _dobError = 'Age must be between 5 and 120 years';
+        _estimatedAge = null;
+        _estimatedMaxHr = null;
+      });
+      return;
+    }
+    _handleDirectAge(age);
+  }
+
+  void _syncAgeController(String text) {
+    if (_ageController.text != text) {
+      _isSyncingAge = true;
+      _ageController.text = text;
+      _isSyncingAge = false;
+    }
+  }
+
+  void _handleDateString(String text) {
+    final parsed = _parseDobDate(text);
+    if (parsed == null) {
       if (text.length >= 10 || !text.contains(RegExp(r'^[0-9\-]+$'))) {
         setState(() {
           _dobError = 'Enter birth date as YYYY-MM-DD';
@@ -82,48 +151,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
 
-    final year = int.tryParse(match.group(1)!);
-    final month = int.tryParse(match.group(2)!);
-    final day = int.tryParse(match.group(3)!);
-    if (year == null ||
-        month == null ||
-        day == null ||
-        month < 1 ||
-        month > 12 ||
-        day < 1 ||
-        day > 31) {
-      setState(() {
-        _dobError = 'Enter a valid calendar date';
-        _estimatedAge = null;
-        _estimatedMaxHr = null;
-      });
-      return;
-    }
-
-    DateTime birthDate;
-    try {
-      birthDate = DateTime(year, month, day);
-      if (birthDate.year != year ||
-          birthDate.month != month ||
-          birthDate.day != day) {
-        setState(() {
-          _dobError = 'Enter a valid calendar date';
-          _estimatedAge = null;
-          _estimatedMaxHr = null;
-        });
-        return;
-      }
-    } catch (_) {
-      setState(() {
-        _dobError = 'Enter a valid calendar date';
-        _estimatedAge = null;
-        _estimatedMaxHr = null;
-      });
-      return;
-    }
-
     final now = DateTime.now();
-    if (birthDate.isAfter(now)) {
+    if (parsed.isAfter(now)) {
       setState(() {
         _dobError = 'Birth date cannot be in the future';
         _estimatedAge = null;
@@ -132,28 +161,50 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
 
-    final age = PreferencesStorage.calculateAge(birthDate, now);
-    if (age < 5 || age > 120) {
-      setState(() {
-        _dobError = 'Age must be between 5 and 120 years';
-        _estimatedAge = null;
-        _estimatedMaxHr = null;
-      });
-      return;
+    final age = DemographicsCalculator.calculateAge(parsed, now);
+    _handleDirectAge(age);
+    if (age >= 5 && age <= 120) {
+      _syncAgeController(age.toString());
+    }
+  }
+
+  DateTime? _parseDobDate(String text) {
+    final match = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(text);
+    if (match == null) return null;
+
+    final g1 = match.group(1);
+    final g2 = match.group(2);
+    final g3 = match.group(3);
+    final year = g1 != null ? int.tryParse(g1) : null;
+    final month = g2 != null ? int.tryParse(g2) : null;
+    final day = g3 != null ? int.tryParse(g3) : null;
+
+    if (year == null ||
+        month == null ||
+        day == null ||
+        month < 1 ||
+        month > 12 ||
+        day < 1 ||
+        day > 31) {
+      return null;
     }
 
-    final maxHr = PreferencesStorage.calculateTanakaMaxHr(age);
-    setState(() {
-      _dobError = null;
-      _estimatedAge = age;
-      _estimatedMaxHr = maxHr;
-    });
+    try {
+      final date = DateTime(year, month, day);
+      if (date.year != year || date.month != month || date.day != day) {
+        return null;
+      }
+      return date;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _pickDate(BuildContext context) async {
     final now = DateTime.now();
-    final initialDate = _estimatedAge != null
-        ? DateTime(now.year - _estimatedAge!, now.month, now.day)
+    final age = _estimatedAge;
+    final initialDate = age != null
+        ? DateTime(now.year - age, now.month, now.day)
         : DateTime(now.year - 25, 1, 1);
     final firstDate = DateTime(now.year - 120, 1, 1);
     final lastDate = now;
@@ -172,12 +223,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  Future<void> _skipOnboarding() async {
-    final storage = ref.read(preferencesStorageProvider);
-    await storage.setCompletedOnboarding(true);
-
+  void _navigateDashboard() {
     ref.invalidate(athleteNameProvider);
-    ref.invalidate(hrPreferencesNotifierProvider);
     ref.invalidate(hrPreferencesProvider);
 
     if (mounted) {
@@ -185,9 +232,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  Future<void> _skipOnboarding() async {
+    final storage = ref.read(preferencesStorageProvider);
+    await storage.setCompletedOnboarding(true);
+    _navigateDashboard();
+  }
+
   Future<void> _completeSetup() async {
     final dobText = _dobController.text.trim();
-    if (dobText.isEmpty) {
+    final ageText = _ageController.text.trim();
+
+    if (dobText.isEmpty && ageText.isEmpty) {
       setState(() {
         _dobError = 'Please enter or select your birth date';
       });
@@ -195,27 +250,38 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
 
     _onDobChanged();
+    if (_estimatedAge == null && ageText.isNotEmpty) {
+      _onAgeChanged();
+    }
+
     if (_dobError != null || _estimatedMaxHr == null) {
+      if (_dobError == null) {
+        setState(() {
+          _dobError = 'Please enter a valid calendar date';
+        });
+      }
       return;
     }
 
     final rawName = _nameController.text.trim();
     final athleteName = rawName.isNotEmpty ? rawName : 'Runner';
-    final maxHr = _estimatedMaxHr!;
+    final maxHr = _estimatedMaxHr;
+    if (maxHr == null) return;
+
+    final age = _estimatedAge;
+    final birthDateToSave = dobText.isNotEmpty
+        ? dobText
+        : (age != null ? '${DateTime.now().year - age}-01-01' : '');
 
     final storage = ref.read(preferencesStorageProvider);
     await storage.saveAthleteName(athleteName);
-    await storage.saveDateOfBirth(dobText);
+    if (birthDateToSave.isNotEmpty) {
+      await storage.saveDateOfBirth(birthDateToSave);
+    }
     await storage.saveMaxHr(maxHr);
     await storage.setCompletedOnboarding(true);
 
-    ref.invalidate(athleteNameProvider);
-    ref.invalidate(hrPreferencesNotifierProvider);
-    ref.invalidate(hrPreferencesProvider);
-
-    if (mounted) {
-      context.go('/dashboard');
-    }
+    _navigateDashboard();
   }
 
   @override
@@ -233,13 +299,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onPressed: () => _goToStep(_currentStep - 1),
               )
             : null,
-        actions: [
-          TextButton(
-            key: const ValueKey('skip_onboarding_button'),
-            onPressed: _skipOnboarding,
-            child: const Text('Skip'),
-          ),
-        ],
       ),
       body: SafeArea(
         child: ConstrainedContent(
@@ -271,6 +330,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       isDark: isDark,
                       nameController: _nameController,
                       dobController: _dobController,
+                      ageController: _ageController,
                       dobError: _dobError,
                       estimatedAge: _estimatedAge,
                       estimatedMaxHr: _estimatedMaxHr,
@@ -324,7 +384,7 @@ class _StepProgressIndicator extends StatelessWidget {
                     : (isDark
                           ? AppColors.surfaceTertiaryDark
                           : AppColors.gray300),
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
             );
           }),
@@ -445,7 +505,7 @@ class _StepOneWelcomeView extends StatelessWidget {
             label: const Text('Get Started'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.brandOrange,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.white,
               minimumSize: const Size.fromHeight(50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
@@ -521,7 +581,7 @@ class _ValuePropositionCard extends StatelessWidget {
                           : AppColors.gray900,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s4),
                   Text(
                     description,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -541,12 +601,13 @@ class _ValuePropositionCard extends StatelessWidget {
   }
 }
 
-/// Step 2: Demographic Setup view capturing Athlete Name and Birth Date,
+/// Step 2: Demographic Setup view capturing Athlete Name and Birth Date / Age,
 /// previewing Tanaka Max HR in real time, and persisting physiological baselines.
 class _StepTwoDemographicView extends StatelessWidget {
   final bool isDark;
   final TextEditingController nameController;
   final TextEditingController dobController;
+  final TextEditingController ageController;
   final String? dobError;
   final int? estimatedAge;
   final int? estimatedMaxHr;
@@ -559,6 +620,7 @@ class _StepTwoDemographicView extends StatelessWidget {
     required this.isDark,
     required this.nameController,
     required this.dobController,
+    required this.ageController,
     required this.dobError,
     required this.estimatedAge,
     required this.estimatedMaxHr,
@@ -570,8 +632,6 @@ class _StepTwoDemographicView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       key: const ValueKey('onboarding_step_2_content'),
       children: [
@@ -584,178 +644,163 @@ class _StepTwoDemographicView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  key: const ValueKey('onboarding_step_2_placeholder'),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDark
-                          ? AppColors.brandOrange.withValues(alpha: 0.15)
-                          : AppColors.brandOrangeTint,
-                    ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 36,
-                      color: AppColors.brandOrange,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.space2),
-                Text(
-                  'Athlete Profile Setup',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.gray900,
-                    letterSpacing: -0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.space1),
-                Text(
-                  'Personalize your baseline profile to calculate your estimated maximum heart rate and target training zones.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.gray700,
-                    height: 1.35,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                _StepTwoHeader(isDark: isDark),
                 const SizedBox(height: AppSpacing.space4),
-                // Athlete Name Field
-                TextField(
-                  key: const ValueKey('athlete_name_input'),
-                  controller: nameController,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Athlete Name',
-                    hintText: 'e.g. Alex, Budi',
-                    prefixIcon: const Icon(Icons.badge_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
+                _AthleteNameField(controller: nameController),
+                const SizedBox(height: AppSpacing.space3),
+                _DobField(
+                  dobController: dobController,
+                  ageController: ageController,
+                  errorText: dobError,
+                  onPickDate: onPickDate,
                 ),
                 const SizedBox(height: AppSpacing.space3),
-                // Date of Birth Field with Date Picker
-                TextField(
-                  key: const ValueKey('dob_input'),
-                  controller: dobController,
-                  keyboardType: TextInputType.datetime,
-                  decoration: InputDecoration(
-                    labelText: 'Date of Birth',
-                    hintText: 'YYYY-MM-DD',
-                    prefixIcon: const Icon(Icons.calendar_today_outlined),
-                    suffixIcon: IconButton(
-                      key: const ValueKey('dob_picker_button'),
-                      icon: const Icon(Icons.calendar_month_rounded),
-                      tooltip: 'Select birth date',
-                      onPressed: onPickDate,
-                    ),
-                    errorText: dobError,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.space3),
-                // Dynamic Tanaka Max HR Preview Card
-                _TanakaMaxHrPreviewCard(
+                _TanakaPreviewCard(
                   isDark: isDark,
                   estimatedAge: estimatedAge,
                   estimatedMaxHr: estimatedMaxHr,
                 ),
                 const SizedBox(height: AppSpacing.space2),
-                // Informational Caption for Deferred Resting HR & Zones
-                Container(
-                  key: const ValueKey('resting_hr_caption'),
-                  padding: const EdgeInsets.all(AppSpacing.space2),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.surfaceTertiaryDark.withValues(alpha: 0.5)
-                        : AppColors.gray100,
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 18,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.gray700,
-                      ),
-                      const SizedBox(width: AppSpacing.space2),
-                      Expanded(
-                        child: Text(
-                          'Resting HR (defaults to 60 bpm) and custom heart rate zones are deferred to Settings to keep onboarding fast.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.gray700,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _RestingHrCaption(isDark: isDark),
               ],
             ),
           ),
         ),
-        // Action Bar (Back, Skip, Complete Setup)
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.space6,
-            vertical: AppSpacing.space3,
+        _StepTwoActions(onBack: onBack, onSkip: onSkip, onComplete: onComplete),
+      ],
+    );
+  }
+}
+
+/// Header for Step 2 Demographics setup.
+class _StepTwoHeader extends StatelessWidget {
+  final bool isDark;
+
+  const _StepTwoHeader({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Center(
+          key: const ValueKey('onboarding_step_2_placeholder'),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark
+                  ? AppColors.brandOrange.withValues(alpha: 0.15)
+                  : AppColors.brandOrangeTint,
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              size: 36,
+              color: AppColors.brandOrange,
+            ),
           ),
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                key: const ValueKey('onboarding_back_button'),
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Back'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(90, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.space2),
-              TextButton(
-                key: const ValueKey('footer_skip_button'),
-                onPressed: onSkip,
-                child: const Text('Skip'),
-              ),
-              const SizedBox(width: AppSpacing.space2),
-              Expanded(
-                child: FilledButton.icon(
-                  key: const ValueKey('complete_onboarding_button'),
-                  onPressed: onComplete,
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('Complete Setup'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.brandOrange,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                    ),
-                    textStyle: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        ),
+        const SizedBox(height: AppSpacing.space2),
+        Text(
+          'Athlete Profile Setup',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.gray900,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.space1),
+        Text(
+          'Personalize your baseline profile to calculate your estimated maximum heart rate and target training zones.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+            height: 1.35,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+/// Athlete Name input field component.
+class _AthleteNameField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _AthleteNameField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      key: const ValueKey('athlete_name_input'),
+      controller: controller,
+      textInputAction: TextInputAction.next,
+      decoration: InputDecoration(
+        labelText: 'Athlete Name',
+        hintText: 'e.g. Alex, Budi',
+        prefixIcon: const Icon(Icons.badge_outlined),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+      ),
+    );
+  }
+}
+
+/// Date of Birth and direct Age input component.
+class _DobField extends StatelessWidget {
+  final TextEditingController dobController;
+  final TextEditingController ageController;
+  final String? errorText;
+  final VoidCallback onPickDate;
+
+  const _DobField({
+    required this.dobController,
+    required this.ageController,
+    required this.errorText,
+    required this.onPickDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: const ValueKey('dob_input'),
+          controller: dobController,
+          keyboardType: TextInputType.datetime,
+          decoration: InputDecoration(
+            labelText: 'Date of Birth',
+            hintText: 'YYYY-MM-DD',
+            prefixIcon: const Icon(Icons.calendar_today_outlined),
+            suffixIcon: IconButton(
+              key: const ValueKey('dob_picker_button'),
+              icon: const Icon(Icons.calendar_month_rounded),
+              tooltip: 'Select birth date',
+              onPressed: onPickDate,
+            ),
+            errorText: errorText,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        TextField(
+          key: const ValueKey('age_input'),
+          controller: ageController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Or Age Directly',
+            hintText: 'e.g. 28',
+            prefixIcon: const Icon(Icons.cake_outlined),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            ),
           ),
         ),
       ],
@@ -764,12 +809,12 @@ class _StepTwoDemographicView extends StatelessWidget {
 }
 
 /// Dynamic Tanaka Max HR estimation card widget.
-class _TanakaMaxHrPreviewCard extends StatelessWidget {
+class _TanakaPreviewCard extends StatelessWidget {
   final bool isDark;
   final int? estimatedAge;
   final int? estimatedMaxHr;
 
-  const _TanakaMaxHrPreviewCard({
+  const _TanakaPreviewCard({
     required this.isDark,
     required this.estimatedAge,
     required this.estimatedMaxHr,
@@ -827,7 +872,7 @@ class _TanakaMaxHrPreviewCard extends StatelessWidget {
                           : AppColors.gray900,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.s4),
                   if (estimatedMaxHr != null && estimatedAge != null) ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -837,6 +882,7 @@ class _TanakaMaxHrPreviewCard extends StatelessWidget {
                           '$estimatedMaxHr bpm',
                           key: const ValueKey('tanaka_max_hr_text'),
                           style: theme.textTheme.titleLarge?.copyWith(
+                            fontFamily: AppTypography.monoFamily,
                             fontWeight: FontWeight.w800,
                             color: AppColors.brandOrange,
                           ),
@@ -852,7 +898,7 @@ class _TanakaMaxHrPreviewCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppSpacing.s4),
                     Text(
                       'Tanaka formula: 208 - (0.7 × $estimatedAge) = $estimatedMaxHr bpm',
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -866,6 +912,7 @@ class _TanakaMaxHrPreviewCard extends StatelessWidget {
                       '-- bpm',
                       key: const ValueKey('tanaka_max_hr_text'),
                       style: theme.textTheme.titleMedium?.copyWith(
+                        fontFamily: AppTypography.monoFamily,
                         fontWeight: FontWeight.bold,
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -886,6 +933,116 @@ class _TanakaMaxHrPreviewCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Informational Caption for Deferred Resting HR & Zones.
+class _RestingHrCaption extends StatelessWidget {
+  final bool isDark;
+
+  const _RestingHrCaption({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      key: const ValueKey('resting_hr_caption'),
+      padding: const EdgeInsets.all(AppSpacing.space2),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.surfaceTertiaryDark.withValues(alpha: 0.5)
+            : AppColors.gray100,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+          ),
+          const SizedBox(width: AppSpacing.space2),
+          Expanded(
+            child: Text(
+              'Resting HR (defaults to 60 bpm) and custom heart rate zones are deferred to Settings to keep onboarding fast.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Action Buttons Footer for Step 2.
+class _StepTwoActions extends StatelessWidget {
+  final VoidCallback onBack;
+  final VoidCallback onSkip;
+  final VoidCallback onComplete;
+
+  const _StepTwoActions({
+    required this.onBack,
+    required this.onSkip,
+    required this.onComplete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.space6,
+        vertical: AppSpacing.space3,
+      ),
+      child: Row(
+        children: [
+          OutlinedButton.icon(
+            key: const ValueKey('onboarding_back_button'),
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('Back'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(90, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.space2),
+          TextButton(
+            key: const ValueKey('footer_skip_button'),
+            onPressed: onSkip,
+            child: const Text('Skip'),
+          ),
+          const SizedBox(width: AppSpacing.space2),
+          Expanded(
+            child: FilledButton.icon(
+              key: const ValueKey('complete_onboarding_button'),
+              onPressed: onComplete,
+              icon: const Icon(Icons.check_rounded),
+              label: const Text('Complete Setup'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brandOrange,
+                foregroundColor: AppColors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                ),
+                textStyle: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

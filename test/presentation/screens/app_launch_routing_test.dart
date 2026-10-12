@@ -57,9 +57,10 @@ void main() {
         // Verifies OnboardingScreen renders on first launch
         expect(find.byType(OnboardingScreen), findsOneWidget);
         expect(find.text('Welcome to Teman Lari'), findsOneWidget);
+        // Per Spec User Story 12 & 87: Step 1 does NOT have an AppBar Skip button
         expect(
           find.byKey(const ValueKey('skip_onboarding_button')),
-          findsOneWidget,
+          findsNothing,
         );
 
         // Verifies MainNavigationScreen and LoginScreen are NEVER rendered on first launch
@@ -88,8 +89,12 @@ void main() {
 
         expect(find.byType(OnboardingScreen), findsOneWidget);
 
-        // Tap Skip
-        await tester.tap(find.byKey(const ValueKey('skip_onboarding_button')));
+        // Advance to Step 2
+        await tester.tap(find.byKey(const ValueKey('get_started_button')));
+        await tester.pumpAndSettle();
+
+        // Tap Skip on Step 2 footer
+        await tester.tap(find.byKey(const ValueKey('footer_skip_button')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 100));
         await tester.pump(const Duration(milliseconds: 500));

@@ -203,7 +203,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Connected'), findsOneWidget);
-      expect(find.text('Budi Santoso'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('connected_athlete_name')),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(StravaIntegrationCard, 'Budi Santoso'),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const ValueKey('disconnect_strava_button')),
         findsOneWidget,
@@ -427,5 +434,47 @@ void main() {
 
       expect(await preferencesStorage.getThresholdPace(), isNull);
     });
+
+    testWidgets(
+      'US_26: Athlete Name in Settings loads from provider, is editable, and saves to storage',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 2000);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        await tester.pumpWidget(
+          buildSettingsScreen(
+            initialAuthState: const AuthState.unauthenticated(),
+            athleteName: 'Budi Santoso',
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Verify Athlete Name field is rendered and pre-populated
+        final nameInput = find.byKey(
+          const ValueKey('settings_athlete_name_input'),
+        );
+        expect(nameInput, findsOneWidget);
+        expect(find.widgetWithText(TextField, 'Budi Santoso'), findsOneWidget);
+
+        // Edit Athlete Name
+        await tester.enterText(nameInput, 'Alex Runner');
+        await tester.pump();
+
+        // Tap Save Changes
+        final saveBtn = find.text('Save Changes');
+        expect(saveBtn, findsOneWidget);
+        await tester.tap(saveBtn);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+
+        // Verify name is saved to storage
+        expect(
+          await preferencesStorage.getAthleteName(),
+          equals('Alex Runner'),
+        );
+      },
+    );
   });
 }

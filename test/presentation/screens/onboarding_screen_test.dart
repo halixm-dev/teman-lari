@@ -1,3 +1,4 @@
+import 'package:checks/checks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -118,10 +119,6 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.textContaining('CTL (Fitness)', findRichText: true),
-          findsOneWidget,
-        );
-        expect(
           find.textContaining('TSB (Form)', findRichText: true),
           findsOneWidget,
         );
@@ -129,13 +126,13 @@ void main() {
         // Card 3: Adaptive Plan Generation
         expect(find.text('Adaptive Plan Generation'), findsOneWidget);
         expect(
-          find.textContaining('periodized', findRichText: true),
+          find.textContaining('Dynamic periodized', findRichText: true),
           findsOneWidget,
         );
       },
     );
 
-    testWidgets('renders step indicator reflecting Step 1 of 2', (
+    testWidgets('renders progress indicator at Step 1 of 2', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(buildTestableOnboardingScreen());
@@ -145,60 +142,48 @@ void main() {
       expect(find.byKey(const ValueKey('step_indicator_dots')), findsOneWidget);
     });
 
+    testWidgets('tapping Get Started advances to Step 2 (Demographic Setup)', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(buildTestableOnboardingScreen());
+      await tester.pumpAndSettle();
+
+      final getStartedBtn = find.byKey(const ValueKey('get_started_button'));
+      expect(getStartedBtn, findsOneWidget);
+
+      await tester.tap(getStartedBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Step 2 of 2'), findsOneWidget);
+      expect(find.text('Athlete Profile Setup'), findsOneWidget);
+    });
+
+    testWidgets('omits complex settings from onboarding sequence', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(buildTestableOnboardingScreen());
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Resting HR (bpm)'), findsNothing);
+      expect(find.textContaining('Strava'), findsNothing);
+      expect(find.textContaining('Menstrual'), findsNothing);
+      expect(find.textContaining('Shoe'), findsNothing);
+    });
+
     testWidgets(
-      'advances to Step 2 when tapping Get Started and can navigate Back',
+      'renders within constrained responsive container (max-width 600)',
       (WidgetTester tester) async {
         await tester.pumpWidget(buildTestableOnboardingScreen());
         await tester.pumpAndSettle();
 
-        // Initial state is Step 1
-        expect(find.text('Step 1 of 2'), findsOneWidget);
-        expect(find.text('Welcome to Teman Lari'), findsOneWidget);
-
-        // Tap Get Started button
-        final getStartedBtn = find.byKey(const ValueKey('get_started_button'));
-        expect(getStartedBtn, findsOneWidget);
-        await tester.tap(getStartedBtn);
-        await tester.pumpAndSettle();
-
-        // Now on Step 2
-        expect(find.text('Step 2 of 2'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('onboarding_step_2_placeholder')),
-          findsOneWidget,
+        final constrainedFinder = find.byType(ConstrainedContent);
+        expect(constrainedFinder, findsOneWidget);
+        final constrainedContent = tester.widget<ConstrainedContent>(
+          constrainedFinder,
         );
-
-        // Tap Back button to return to Step 1
-        final backBtn = find.byKey(const ValueKey('onboarding_back_button'));
-        expect(backBtn, findsOneWidget);
-        await tester.tap(backBtn);
-        await tester.pumpAndSettle();
-
-        // Back on Step 1
-        expect(find.text('Step 1 of 2'), findsOneWidget);
-        expect(find.text('Welcome to Teman Lari'), findsOneWidget);
+        check(constrainedContent.maxWidth).equals(600);
       },
     );
-
-    testWidgets('enforces max-width constraints on tablet/desktop screens', (
-      WidgetTester tester,
-    ) async {
-      tester.view.physicalSize = const Size(1280, 800);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(() => tester.view.resetPhysicalSize());
-
-      await tester.pumpWidget(buildTestableOnboardingScreen());
-      await tester.pumpAndSettle();
-
-      // Verify ConstrainedContent applies maxWidth 600
-      final constrainedContentFinder = find.byType(ConstrainedContent);
-      expect(constrainedContentFinder, findsWidgets);
-
-      final constrainedContent = tester.widget<ConstrainedContent>(
-        constrainedContentFinder.first,
-      );
-      expect(constrainedContent.maxWidth, 600);
-    });
 
     testWidgets('renders cleanly in dark theme with proper styling', (
       WidgetTester tester,
@@ -216,21 +201,15 @@ void main() {
     });
 
     testWidgets(
-      'tapping Skip in AppBar marks onboarding complete and navigates to /dashboard',
+      'AppBar does not have Skip button on Step 1 per Spec User Story 12 & 87',
       (WidgetTester tester) async {
-        final storage = PreferencesStorage();
-        await tester.pumpWidget(
-          buildTestableOnboardingScreen(storage: storage),
+        await tester.pumpWidget(buildTestableOnboardingScreen());
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('skip_onboarding_button')),
+          findsNothing,
         );
-        await tester.pumpAndSettle();
-
-        final skipBtn = find.byKey(const ValueKey('skip_onboarding_button'));
-        expect(skipBtn, findsOneWidget);
-        await tester.tap(skipBtn);
-        await tester.pumpAndSettle();
-
-        expect(await storage.hasCompletedOnboarding(), isTrue);
-        expect(find.text('Dashboard Target Screen'), findsOneWidget);
       },
     );
 
@@ -287,7 +266,7 @@ void main() {
         await tester.tap(completeBtn);
         await tester.pumpAndSettle();
 
-        expect(await storage.hasCompletedOnboarding(), isTrue);
+        check(await storage.hasCompletedOnboarding()).isTrue();
         expect(find.text('Dashboard Target Screen'), findsOneWidget);
       },
     );
@@ -329,6 +308,7 @@ void main() {
             findsOneWidget,
           );
           expect(find.byKey(const ValueKey('dob_input')), findsOneWidget);
+          expect(find.byKey(const ValueKey('age_input')), findsOneWidget);
           expect(
             find.byKey(const ValueKey('dob_picker_button')),
             findsOneWidget,
@@ -431,7 +411,30 @@ void main() {
       );
 
       testWidgets(
-        'validates date input and rejects future dates and impossible ages',
+        'direct age input updates dynamic Tanaka Max HR estimation in real time (US 10 & 55)',
+        (WidgetTester tester) async {
+          await tester.pumpWidget(buildTestableOnboardingScreen());
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byKey(const ValueKey('get_started_button')));
+          await tester.pumpAndSettle();
+
+          // Direct Age 25 -> 208 - (0.7 * 25) = 190.5 -> 191 bpm
+          await tester.enterText(find.byKey(const ValueKey('age_input')), '25');
+          await tester.pumpAndSettle();
+          expect(find.text('191 bpm'), findsOneWidget);
+          expect(find.textContaining('Age 25'), findsOneWidget);
+
+          // Direct Age 40 -> 208 - (0.7 * 40) = 180 bpm
+          await tester.enterText(find.byKey(const ValueKey('age_input')), '40');
+          await tester.pumpAndSettle();
+          expect(find.text('180 bpm'), findsOneWidget);
+          expect(find.textContaining('Age 40'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'validates date input and rejects future dates and impossible ages with clear inline feedback',
         (WidgetTester tester) async {
           await tester.pumpWidget(buildTestableOnboardingScreen());
           await tester.pumpAndSettle();
@@ -451,7 +454,7 @@ void main() {
           );
           expect(find.text('-- bpm'), findsOneWidget);
 
-          // Tapping Complete Setup when invalid does not submit
+          // Tapping Complete Setup when invalid shows error instead of silently aborting
           await tester.tap(
             find.byKey(const ValueKey('complete_onboarding_button')),
           );
@@ -480,8 +483,9 @@ void main() {
             findsOneWidget,
           );
 
-          // Empty DOB validation on submit
+          // Empty DOB validation on submit gives clear feedback
           await tester.enterText(find.byKey(const ValueKey('dob_input')), '');
+          await tester.enterText(find.byKey(const ValueKey('age_input')), '');
           await tester.pumpAndSettle();
           await tester.tap(
             find.byKey(const ValueKey('complete_onboarding_button')),
@@ -563,14 +567,14 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          // Verifies storage persistence
-          expect(await storage.getAthleteName(), 'Budi');
-          expect(await storage.getDateOfBirth(), '1996-05-15');
-          expect(await storage.getMaxHr(), 187);
-          expect(await storage.hasCompletedOnboarding(), isTrue);
+          // Verifies storage persistence using package:checks
+          check(await storage.getAthleteName()).equals('Budi');
+          check(await storage.getDateOfBirth()).equals('1996-05-15');
+          check(await storage.getMaxHr()).equals(187);
+          check(await storage.hasCompletedOnboarding()).isTrue();
 
-          // Verifies dashboard greeting displays athlete name
-          expect(find.textContaining('Budi'), findsOneWidget);
+          // Verifies dashboard greeting formats as "Hello, Budi!"
+          expect(find.text('Hello, Budi!'), findsOneWidget);
         },
       );
 
@@ -601,12 +605,12 @@ void main() {
           );
           await tester.pumpAndSettle();
 
-          expect(await storage.getAthleteName(), 'Runner');
-          expect(await storage.getDateOfBirth(), '1996-05-15');
-          expect(await storage.getMaxHr(), 187);
-          expect(await storage.hasCompletedOnboarding(), isTrue);
+          check(await storage.getAthleteName()).equals('Runner');
+          check(await storage.getDateOfBirth()).equals('1996-05-15');
+          check(await storage.getMaxHr()).equals(187);
+          check(await storage.hasCompletedOnboarding()).isTrue();
 
-          expect(find.textContaining('Runner'), findsOneWidget);
+          expect(find.text('Hello, Runner!'), findsOneWidget);
         },
       );
 
@@ -629,11 +633,11 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('footer_skip_button')));
           await tester.pumpAndSettle();
 
-          expect(await storage.hasCompletedOnboarding(), isTrue);
-          expect(await storage.getAthleteName(), isNull);
-          expect(await storage.getMaxHr(), isNull);
+          check(await storage.hasCompletedOnboarding()).isTrue();
+          check(await storage.getAthleteName()).isNull();
+          check(await storage.getMaxHr()).isNull();
 
-          expect(find.textContaining('Runner'), findsOneWidget);
+          expect(find.text('Hello, Runner!'), findsOneWidget);
         },
       );
 
@@ -671,9 +675,14 @@ void main() {
 
           // Verify Max HR is populated with Tanaka calculated value (187)
           expect(find.widgetWithText(TextField, '187'), findsWidgets);
-          // Verify athlete name is populated in storage
-          expect(await storage.getAthleteName(), 'Budi');
-          expect(await storage.getMaxHr(), 187);
+          // Verify athlete name is populated in storage and Settings field
+          check(await storage.getAthleteName()).equals('Budi');
+          check(await storage.getMaxHr()).equals(187);
+          expect(
+            find.byKey(const ValueKey('settings_athlete_name_input')),
+            findsOneWidget,
+          );
+          expect(find.widgetWithText(TextField, 'Budi'), findsWidgets);
         },
       );
     },

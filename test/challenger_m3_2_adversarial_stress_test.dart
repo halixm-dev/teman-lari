@@ -650,7 +650,18 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.text('Connected'), findsOneWidget);
-        expect(find.text('Legacy Olympian'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('connected_athlete_name')),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(const ValueKey('connected_athlete_name')),
+              )
+              .data,
+          'Legacy Olympian',
+        );
         expect(
           find.byKey(const ValueKey('disconnect_strava_button')),
           findsOneWidget,

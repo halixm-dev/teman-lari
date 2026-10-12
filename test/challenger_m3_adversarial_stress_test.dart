@@ -556,7 +556,14 @@ void main() {
         expect(find.byType(SettingsScreen), findsOneWidget);
         expect(find.byType(StravaIntegrationCard), findsOneWidget);
         expect(find.text('Connected'), findsOneWidget);
-        expect(find.text('Maya Runner'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('connected_athlete_name')),
+          findsOneWidget,
+        );
+        expect(
+          find.widgetWithText(StravaIntegrationCard, 'Maya Runner'),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('disconnect_strava_button')),
           findsOneWidget,
