@@ -215,6 +215,97 @@ void main() {
         ).deepEquals([102, 101, -1001]);
       },
     );
+
+    test(
+      'getAllActivities returns activities saved weeks and months ago intact and chronologically sorted (Zero-TTL)',
+      () async {
+        final box = await dataSource.activitiesBox;
+        final thirtyDaysAgoSync = DateTime.now()
+            .subtract(const Duration(days: 30))
+            .millisecondsSinceEpoch;
+        final sevenDaysAgoSync = DateTime.now()
+            .subtract(const Duration(days: 7))
+            .millisecondsSinceEpoch;
+
+        const oldRun = ActivityModel(
+          id: 50,
+          name: 'Month Old Run',
+          type: 'Run',
+          distance: 10000.0,
+          movingTime: 3000,
+          elapsedTime: 3100,
+          totalElevationGain: 40.0,
+          startDate: '2026-04-15T07:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.2,
+        );
+
+        const recentRun = ActivityModel(
+          id: 51,
+          name: 'Week Old Run',
+          type: 'Run',
+          distance: 5000.0,
+          movingTime: 1500,
+          elapsedTime: 1550,
+          totalElevationGain: 20.0,
+          startDate: '2026-05-10T07:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.0,
+        );
+
+        await box.put(50, {
+          'id': 50,
+          'data': jsonEncode(oldRun.toJson()),
+          'synced_at': thirtyDaysAgoSync,
+        });
+
+        await box.put(51, {
+          'id': 51,
+          'data': jsonEncode(recentRun.toJson()),
+          'synced_at': sevenDaysAgoSync,
+        });
+
+        // Stale cache returns null under 1-hour TTL
+        final cached = await dataSource.getCachedActivities();
+        check(cached).isNull();
+
+        // Zero-TTL permanent SSOT retrieves all activities sorted chronologically descending
+        final allActivities = await dataSource.getAllActivities();
+        check(allActivities).length.equals(2);
+        check(
+          allActivities[0].id,
+        ).equals(51); // 2026-05-10 is newer than 2026-04-15
+        check(allActivities[1].id).equals(50);
+      },
+    );
+
+    test(
+      'getAllHeartRateStreams returns heart rate streams saved weeks ago without TTL eviction',
+      () async {
+        final box = await dataSource.hrStreamsBox;
+        final fourteenDaysAgoSync = DateTime.now()
+            .subtract(const Duration(days: 14))
+            .millisecondsSinceEpoch;
+        final streamData = [135.0, 145.0, 155.0, 165.0];
+
+        await box.put(101, {
+          'activity_id': 101,
+          'data': jsonEncode(streamData),
+          'synced_at': fourteenDaysAgoSync,
+        });
+
+        // 1-hour TTL check filters it out:
+        final cachedTtl = await dataSource.getCachedHeartRateStreams(
+          checkTtl: true,
+        );
+        check(cachedTtl).not((it) => it.containsKey(101));
+
+        // Permanent Zero-TTL retrieval preserves stream indefinitely:
+        final allStreams = await dataSource.getAllHeartRateStreams();
+        check(allStreams).containsKey(101);
+        check(allStreams[101]!).deepEquals(streamData);
+      },
+    );
   });
 
   group('LocalActivityDataSource - Single Activity Operations', () {

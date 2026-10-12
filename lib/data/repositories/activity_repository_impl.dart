@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:math' show pow;
 
 import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
@@ -25,9 +26,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
   });
 
   Future<bool> _isAuthenticated() async {
-    if (tokenStorage == null) return false;
+    final storage = tokenStorage;
+    if (storage == null) return false;
     try {
-      final tokens = await tokenStorage!.getTokens();
+      final tokens = await storage.getTokens();
       if (tokens == null) return false;
       return tokens.accessToken.isNotEmpty;
     } catch (_) {
@@ -200,6 +202,50 @@ class ActivityRepositoryImpl implements ActivityRepository {
   }
 
   @override
+  Future<void> saveActivity(Activity activity) async {
+    final typeString = switch (activity.type) {
+      ActivityType.run => 'Run',
+      ActivityType.ride => 'Ride',
+      ActivityType.swim => 'Swim',
+      ActivityType.workout => 'Workout',
+      ActivityType.walk => 'Walk',
+      ActivityType.other => 'Other',
+    };
+
+    final distanceMeters = activity.distanceKm * 1000.0;
+    final movingSeconds = activity.movingTime.inSeconds;
+    final avgSpeed = movingSeconds > 0 ? distanceMeters / movingSeconds : 0.0;
+    final hrData = activity.heartRateData;
+
+    final model = ActivityModel(
+      id: activity.id,
+      name: activity.name,
+      type: typeString,
+      distance: distanceMeters,
+      movingTime: movingSeconds,
+      elapsedTime: movingSeconds,
+      totalElevationGain: activity.elevationGainM,
+      startDate: activity.date.toUtc().toIso8601String(),
+      averageSpeed: avgSpeed,
+      maxSpeed: avgSpeed,
+      averageHeartrate: activity.avgHeartRate,
+      maxHeartrate: activity.maxHeartRate,
+      averageCadence: activity.avgCadence,
+      sufferScore: activity.sufferScore,
+      hasHeartrate:
+          activity.avgHeartRate != null ||
+          (hrData != null && hrData.isNotEmpty),
+      perceivedExertion: activity.perceivedExertion,
+    );
+
+    await localDataSource.saveActivity(model);
+
+    if (hrData != null && hrData.isNotEmpty) {
+      await localDataSource.saveHeartRateStream(activity.id, hrData);
+    }
+  }
+
+  @override
   Future<Map<int, List<double>>> getHeartRateStreams(
     List<int> activityIds,
   ) async {
@@ -261,8 +307,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
           movingTimeSeconds / (distanceKm > 0 ? distanceKm : 1);
 
       TrainingLoad load;
-      if (model.averageHeartrate != null) {
-        final hrPercent = model.averageHeartrate! / maxHr;
+      final avgHr = model.averageHeartrate;
+      final rpe = model.perceivedExertion;
+      if (avgHr != null) {
+        final hrPercent = avgHr / maxHr;
         if (hrPercent < 0.70) {
           load = TrainingLoad.easy;
         } else if (hrPercent < 0.80) {
@@ -272,33 +320,29 @@ class ActivityRepositoryImpl implements ActivityRepository {
         } else {
           load = TrainingLoad.veryHard;
         }
+      } else if (rpe != null) {
+        final tss = (model.movingTime / 3600.0) * pow(rpe / 10.0, 2) * 100.0;
+        if (tss < 30) {
+          load = TrainingLoad.easy;
+        } else if (tss < 60) {
+          load = TrainingLoad.moderate;
+        } else if (tss < 90) {
+          load = TrainingLoad.hard;
+        } else {
+          load = TrainingLoad.veryHard;
+        }
       } else {
         load = TrainingLoad.moderate;
       }
 
-      ActivityType parsedType;
-      switch (model.type) {
-        case 'Run':
-          parsedType = ActivityType.run;
-          break;
-        case 'Ride':
-        case 'VirtualRide':
-          parsedType = ActivityType.ride;
-          break;
-        case 'Swim':
-          parsedType = ActivityType.swim;
-          break;
-        case 'WeightTraining':
-        case 'Workout':
-        case 'Crossfit':
-          parsedType = ActivityType.workout;
-          break;
-        case 'Walk':
-          parsedType = ActivityType.walk;
-          break;
-        default:
-          parsedType = ActivityType.other;
-      }
+      final parsedType = switch (model.type) {
+        'Run' => ActivityType.run,
+        'Ride' || 'VirtualRide' => ActivityType.ride,
+        'Swim' => ActivityType.swim,
+        'WeightTraining' || 'Workout' || 'Crossfit' => ActivityType.workout,
+        'Walk' => ActivityType.walk,
+        _ => ActivityType.other,
+      };
 
       return Activity(
         id: model.id,
@@ -314,6 +358,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         maxHeartRate: model.maxHeartrate,
         avgCadence: model.averageCadence,
         sufferScore: model.sufferScore,
+        perceivedExertion: model.perceivedExertion,
       );
     }).toList();
   }

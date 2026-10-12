@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:go_router/go_router.dart';
 
 import '../../core/services/voice_coach_service.dart';
@@ -13,7 +13,9 @@ import '../../core/services/sound_effects_service.dart';
 import '../theme/app_colors.dart';
 import '../../core/services/gps_service.dart';
 import '../../core/services/pedometer_service.dart';
+import '../../domain/entities/activity.dart';
 import '../../domain/entities/training_plan.dart';
+import '../providers/activities_provider.dart';
 import '../widgets/run_session/run_controls.dart';
 import '../widgets/run_session/run_pacer_display.dart';
 import '../widgets/run_session/run_secondary_metrics.dart';
@@ -57,6 +59,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   final _soundFx = SoundEffectsService();
   WorkoutPhase? _lastPhase;
   bool _midpointAnnounced = false;
+  bool _isSaved = false;
 
   static const double _smoothingAlpha = 0.25;
   static const Duration _gpsTimeout = Duration(seconds: 10);
@@ -308,6 +311,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
     if (newPhase != _lastPhase) {
       if (newPhase == WorkoutPhase.finished) {
+        HapticFeedback.heavyImpact();
         if (_state.isAudioCoachOn) {
           ref.read(voiceCoachProvider).announceWorkoutComplete();
         }
@@ -343,6 +347,10 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
         segments: _state.segments,
       );
     });
+
+    if (newPhase == WorkoutPhase.finished) {
+      _saveWorkout();
+    }
   }
 
   void _toggleLock() {
@@ -377,7 +385,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     });
   }
 
-  void _endWorkout() {
+  Future<void> _endWorkout() async {
     _timer?.cancel();
     if (_state.isAudioCoachOn) {
       ref.read(voiceCoachProvider).announceWorkoutComplete();
@@ -392,8 +400,62 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
         isRunning: false,
         isLocked: _state.isLocked,
         isAudioCoachOn: _state.isAudioCoachOn,
+        segments: _state.segments,
       );
     });
+    await _saveWorkout();
+  }
+
+  Future<void> _saveWorkout() async {
+    if (_isSaved) return;
+    _isSaved = true;
+
+    final paceSec = _state.distanceKm > 0
+        ? (_state.elapsedSeconds / _state.distanceKm).round()
+        : (_state.currentPaceSecondsPerKm ?? 300);
+
+    final double? avgCadence = (_lastStepCount > 0 && _state.elapsedSeconds > 0)
+        ? (_lastStepCount / (_state.elapsedSeconds / 60.0))
+        : null;
+
+    final label = typeLabel(_state.plan.type);
+    final name = label.endsWith('Run') ? label : '$label Run';
+
+    final activity = Activity(
+      id: -DateTime.now().millisecondsSinceEpoch,
+      name: name,
+      date: DateTime.now(),
+      type: ActivityType.run,
+      distanceKm: _state.distanceKm,
+      movingTime: Duration(seconds: _state.elapsedSeconds),
+      pace: Duration(seconds: paceSec),
+      elevationGainM: 0.0,
+      trainingLoad: TrainingLoad.moderate,
+      avgCadence: avgCadence,
+      isLocal: true,
+    );
+
+    try {
+      await ref.read(activitiesProvider.notifier).saveCompletedRun(activity);
+    } catch (_) {
+      // Local save failure should not crash the session screen
+    }
+  }
+
+  void _exitToDashboard() {
+    try {
+      if (GoRouter.maybeOf(context) != null) {
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/dashboard');
+        }
+      } else if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (_) {
+      // Ignore navigation errors in headless test runners
+    }
   }
 
   @override
@@ -401,7 +463,13 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _showExitSheet(context);
+        if (!didPop) {
+          if (_state.phase == WorkoutPhase.finished) {
+            _exitToDashboard();
+          } else {
+            _showExitSheet(context);
+          }
+        }
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -489,9 +557,15 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                 planName: typeLabel(_state.plan.type),
                 phase: _state.phase,
                 isFinished: _state.phase == WorkoutPhase.finished,
-                onExit: () => _showExitSheet(context),
+                onExit: () {
+                  if (_state.phase == WorkoutPhase.finished) {
+                    _exitToDashboard();
+                  } else {
+                    _showExitSheet(context);
+                  }
+                },
               ),
-              if (_state.phase == WorkoutPhase.finished)
+              if (_state.phase == WorkoutPhase.finished) ...[
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
@@ -502,8 +576,20 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                       color: _phaseColorLight(_state.phase),
                     ),
                   ),
-                )
-              else
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
+                  child: FilledButton.icon(
+                    key: const Key('returnToDashboardButton'),
+                    onPressed: _exitToDashboard,
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Return to Dashboard'),
+                  ),
+                ),
+              ] else
                 Expanded(
                   child: RunTimerDisplay(
                     phaseArcs: _buildPhaseArcs(),
@@ -555,7 +641,13 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
           planName: typeLabel(_state.plan.type),
           phase: _state.phase,
           isFinished: _state.phase == WorkoutPhase.finished,
-          onExit: () => _showExitSheet(context),
+          onExit: () {
+            if (_state.phase == WorkoutPhase.finished) {
+              _exitToDashboard();
+            } else {
+              _showExitSheet(context);
+            }
+          },
         ),
         Expanded(
           child: RunTimerDisplay(
@@ -564,7 +656,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
             phaseLabel: _currentPhaseLabel(),
           ),
         ),
-        if (_state.phase == WorkoutPhase.finished)
+        if (_state.phase == WorkoutPhase.finished) ...[
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text(
@@ -575,8 +667,20 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                 color: _phaseColorLight(_state.phase),
               ),
             ),
-          )
-        else ...[
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: FilledButton.icon(
+              key: const Key('returnToDashboardButton'),
+              onPressed: _exitToDashboard,
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Return to Dashboard'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+            ),
+          ),
+        ] else ...[
           RunPacerDisplay(
             currentPaceSecondsPerKm: _state.currentPaceSecondsPerKm,
             fastestTargetSeconds: _state.fastestTarget.inSeconds,
@@ -742,11 +846,13 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: FilledButton(
-                                onPressed: () {
+                                onPressed: () async {
                                   HapticFeedback.heavyImpact();
                                   Navigator.of(sheetContext).pop();
-                                  _endWorkout();
-                                  context.pop();
+                                  await _endWorkout();
+                                  if (mounted) {
+                                    _exitToDashboard();
+                                  }
                                 },
                                 style: FilledButton.styleFrom(
                                   backgroundColor: AppColors.danger,
@@ -902,7 +1008,7 @@ class _Header extends StatelessWidget {
           IconButton(
             onPressed: onExit,
             icon: Icon(Icons.close, color: theme.colorScheme.onSurface),
-            tooltip: 'Exit workout',
+            tooltip: isFinished ? 'Return to dashboard' : 'Exit workout',
             style: IconButton.styleFrom(
               backgroundColor: theme.colorScheme.surfaceContainerHighest,
               minimumSize: const Size(44, 44),

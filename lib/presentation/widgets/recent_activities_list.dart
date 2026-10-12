@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/activities_provider.dart';
 import '../theme/app_typography.dart';
 import 'compact_activity_card.dart';
+import 'manual_run_entry_sheet.dart';
 
 class RecentActivitiesList extends ConsumerStatefulWidget {
   const RecentActivitiesList({super.key});
@@ -26,7 +27,23 @@ class _RecentActivitiesListState extends ConsumerState<RecentActivitiesList> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Recent Activities', style: AppTypography.headingLg),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Recent Activities',
+                    style: AppTypography.headingLg,
+                  ),
+                ),
+                TextButton.icon(
+                  key: const Key('recent_activities_log_manual_run_button'),
+                  onPressed: () => showManualRunEntrySheet(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Log Manual Run'),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             statsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
