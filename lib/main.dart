@@ -4,41 +4,68 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/utils/responsive.dart';
+import 'data/datasources/preferences_storage.dart';
 import 'domain/entities/training_plan.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/core_provider.dart';
 import 'presentation/screens/analysis_screen.dart';
 import 'presentation/screens/dashboard_screen.dart';
 import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/onboarding_screen.dart';
 import 'presentation/screens/plan_screen.dart';
 import 'presentation/screens/run_session_screen.dart';
 import 'presentation/screens/settings_screen.dart';
 import 'presentation/theme/app_theme.dart';
 
-final _router = GoRouter(
-  initialLocation: '/dashboard',
-  routes: [
-    GoRoute(path: '/', redirect: (context, state) => '/dashboard'),
-    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-    GoRoute(
-      path: '/dashboard',
-      builder: (context, state) => const MainNavigationScreen(),
-    ),
-    GoRoute(
-      path: '/analysis',
-      builder: (context, state) => const AnalysisScreen(),
-    ),
-    GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),
-    GoRoute(
-      path: '/run-session',
-      builder: (context, state) =>
-          RunSessionScreen(day: state.extra as TrainingDay),
-    ),
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
-    ),
-  ],
-);
+GoRouter createRouter({
+  PreferencesStorage? preferencesStorage,
+  String initialLocation = '/dashboard',
+}) {
+  final storage = preferencesStorage ?? PreferencesStorage();
+  return GoRouter(
+    initialLocation: initialLocation,
+    routes: [
+      GoRoute(path: '/', redirect: (context, state) => '/dashboard'),
+      GoRoute(
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/dashboard',
+        builder: (context, state) => const MainNavigationScreen(),
+      ),
+      GoRoute(
+        path: '/analysis',
+        builder: (context, state) => const AnalysisScreen(),
+      ),
+      GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),
+      GoRoute(
+        path: '/run-session',
+        builder: (context, state) =>
+            RunSessionScreen(day: state.extra as TrainingDay),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+    ],
+    redirect: (context, state) async {
+      final hasCompleted = await storage.hasCompletedOnboarding();
+      final loc = state.matchedLocation;
+      if (loc == '/') {
+        return hasCompleted ? '/dashboard' : '/onboarding';
+      }
+      if (!hasCompleted && loc == '/dashboard') {
+        return '/onboarding';
+      }
+      if (hasCompleted && loc == '/onboarding') {
+        return '/dashboard';
+      }
+      return null;
+    },
+  );
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,10 +73,37 @@ void main() async {
   runApp(const ProviderScope(child: TemanLariApp()));
 }
 
-class TemanLariApp extends StatelessWidget {
+class TemanLariApp extends ConsumerStatefulWidget {
   final RouterConfig<Object>? routerConfig;
 
   const TemanLariApp({super.key, this.routerConfig});
+
+  @override
+  ConsumerState<TemanLariApp> createState() => _TemanLariAppState();
+}
+
+class _TemanLariAppState extends ConsumerState<TemanLariApp> {
+  late RouterConfig<Object> _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router =
+        widget.routerConfig ??
+        createRouter(preferencesStorage: ref.read(preferencesStorageProvider));
+  }
+
+  @override
+  void didUpdateWidget(TemanLariApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.routerConfig != oldWidget.routerConfig) {
+      _router =
+          widget.routerConfig ??
+          createRouter(
+            preferencesStorage: ref.read(preferencesStorageProvider),
+          );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +113,7 @@ class TemanLariApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      routerConfig: routerConfig ?? _router,
+      routerConfig: _router,
     );
   }
 }

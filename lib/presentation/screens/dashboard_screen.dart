@@ -63,13 +63,10 @@ class DashboardScreen extends ConsumerWidget {
   }
 
   String _greeting(String? name) {
-    final h = DateTime.now().hour;
-    final tg = h < 12
-        ? 'Good morning'
-        : h < 17
-        ? 'Good afternoon'
-        : 'Good evening';
-    return '$tg, ${name ?? 'Runner'}';
+    final athlete = (name != null && name.trim().isNotEmpty)
+        ? name.trim()
+        : 'Runner';
+    return 'Hello, $athlete!';
   }
 }
 

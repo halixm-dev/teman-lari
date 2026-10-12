@@ -161,7 +161,7 @@ void main() {
     await Hive.openBox('activities');
     await Hive.openBox('hr_streams');
 
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'has_completed_onboarding': true});
     preferencesStorage = PreferencesStorage();
     fakeTokenStorage = FakeTokenStorage();
     fakeAuthDataSource = FakeStravaAuthDataSource();
@@ -556,7 +556,14 @@ void main() {
         expect(find.byType(SettingsScreen), findsOneWidget);
         expect(find.byType(StravaIntegrationCard), findsOneWidget);
         expect(find.text('Connected'), findsOneWidget);
-        expect(find.text('Maya Runner'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('connected_athlete_name')),
+          findsOneWidget,
+        );
+        expect(
+          find.widgetWithText(StravaIntegrationCard, 'Maya Runner'),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('disconnect_strava_button')),
           findsOneWidget,

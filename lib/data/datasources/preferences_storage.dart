@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/usecases/demographics_calculator.dart';
+
 class HrPreferences {
   final int? maxHr;
   final int restingHr;
@@ -27,8 +29,30 @@ class PreferencesStorage {
   static const _keyAthleteName = 'athlete_name';
   static const _keyWeekInCycle = 'week_in_cycle';
   static const _keyCycleStartDate = 'cycle_start_date';
+  static const _keyHasCompletedOnboarding = 'has_completed_onboarding';
+
+  /// Calculates estimated Maximum Heart Rate using the clinically validated Tanaka formula:
+  /// HR_max = round(208 - 0.7 * age)
+  static int calculateTanakaMaxHr(int age) {
+    return DemographicsCalculator.calculateTanakaMaxHr(age);
+  }
+
+  /// Calculates elapsed age in years from birth date given an optional reference date.
+  static int calculateAge(DateTime birthDate, [DateTime? referenceDate]) {
+    return DemographicsCalculator.calculateAge(birthDate, referenceDate);
+  }
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  Future<bool> hasCompletedOnboarding() async {
+    final prefs = await _prefs;
+    return prefs.getBool(_keyHasCompletedOnboarding) ?? false;
+  }
+
+  Future<void> setCompletedOnboarding([bool completed = true]) async {
+    final prefs = await _prefs;
+    await prefs.setBool(_keyHasCompletedOnboarding, completed);
+  }
 
   Future<int> getRestingHr() async =>
       (await _prefs).getInt(_keyRestingHr) ?? 60;
@@ -79,6 +103,11 @@ class PreferencesStorage {
   Future<void> saveDateOfBirth(String value) async {
     final prefs = await _prefs;
     await prefs.setString(_keyDateOfBirth, value);
+  }
+
+  Future<String?> getDateOfBirth() async {
+    final prefs = await _prefs;
+    return prefs.getString(_keyDateOfBirth);
   }
 
   Future<bool> updateFromStrava({
@@ -169,16 +198,19 @@ class PreferencesStorage {
   int? _computeAge(String? dateOfBirth) {
     if (dateOfBirth == null) return null;
     final parts = dateOfBirth.split('-');
-    if (parts.length != 3) return null;
-    final year = int.tryParse(parts[0]);
-    if (year == null) return null;
-    final now = DateTime.now();
-    var age = now.year - year;
-    final month = int.tryParse(parts[1]) ?? 1;
-    final day = int.tryParse(parts[2]) ?? 1;
-    if (now.month < month || (now.month == month && now.day < day)) {
-      age--;
+    if (parts.length != 3) {
+      final directAge = int.tryParse(dateOfBirth);
+      if (directAge != null) return directAge;
+      return null;
     }
-    return age;
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (year == null || month == null || day == null) return null;
+    return calculateAge(DateTime(year, month, day));
   }
 }
+
+/// Tanaka formula calculation: round(208 - 0.7 * age)
+int calculateTanakaMaxHr(int age) =>
+    PreferencesStorage.calculateTanakaMaxHr(age);

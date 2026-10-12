@@ -11,6 +11,7 @@ class AppTypography {
       GoogleFonts.figtree(fontWeight: FontWeight.w800);
 
   static TextStyle get jetbrainsMono => GoogleFonts.jetBrainsMono();
+  static String? get monoFamily => GoogleFonts.jetBrainsMono().fontFamily;
 
   static TextStyle get displayXl =>
       figtreeExtraBold.copyWith(fontSize: 48, height: 1.1);
@@ -53,3 +54,6 @@ class AppTypography {
 
   static TextStyle get statLabel => caption.copyWith(letterSpacing: 0.05);
 }
+
+/// Alias for [AppTypography] per design system naming convention.
+typedef AppTextStyles = AppTypography;

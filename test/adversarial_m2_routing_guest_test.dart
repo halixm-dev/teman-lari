@@ -98,7 +98,9 @@ void main() {
     setUp(() async {
       tempDir = await Directory.systemTemp.createTemp('adversarial_m2_');
       Hive.init(tempDir.path);
-      SharedPreferences.setMockInitialValues({});
+      SharedPreferences.setMockInitialValues({
+        'has_completed_onboarding': true,
+      });
       hostileRemoteDataSource = HostileNetworkActivityDataSource();
       fakeTokenStorage = FakeTokenStorage(); // Zero stored tokens
     });
