@@ -29,6 +29,23 @@ class PreferencesStorage {
   static const _keyCycleStartDate = 'cycle_start_date';
   static const _keyHasCompletedOnboarding = 'has_completed_onboarding';
 
+  /// Calculates estimated Maximum Heart Rate using the clinically validated Tanaka formula:
+  /// HR_max = round(208 - 0.7 * age)
+  static int calculateTanakaMaxHr(int age) {
+    return (208 - 0.7 * age).round();
+  }
+
+  /// Calculates elapsed age in years from birth date given an optional reference date.
+  static int calculateAge(DateTime birthDate, [DateTime? referenceDate]) {
+    final now = referenceDate ?? DateTime.now();
+    var age = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      age--;
+    }
+    return age;
+  }
+
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   Future<bool> hasCompletedOnboarding() async {
@@ -90,6 +107,11 @@ class PreferencesStorage {
   Future<void> saveDateOfBirth(String value) async {
     final prefs = await _prefs;
     await prefs.setString(_keyDateOfBirth, value);
+  }
+
+  Future<String?> getDateOfBirth() async {
+    final prefs = await _prefs;
+    return prefs.getString(_keyDateOfBirth);
   }
 
   Future<bool> updateFromStrava({
@@ -182,14 +204,13 @@ class PreferencesStorage {
     final parts = dateOfBirth.split('-');
     if (parts.length != 3) return null;
     final year = int.tryParse(parts[0]);
-    if (year == null) return null;
-    final now = DateTime.now();
-    var age = now.year - year;
-    final month = int.tryParse(parts[1]) ?? 1;
-    final day = int.tryParse(parts[2]) ?? 1;
-    if (now.month < month || (now.month == month && now.day < day)) {
-      age--;
-    }
-    return age;
+    final month = int.tryParse(parts[1]);
+    final day = int.tryParse(parts[2]);
+    if (year == null || month == null || day == null) return null;
+    return calculateAge(DateTime(year, month, day));
   }
 }
+
+/// Tanaka formula calculation: round(208 - 0.7 * age)
+int calculateTanakaMaxHr(int age) =>
+    PreferencesStorage.calculateTanakaMaxHr(age);

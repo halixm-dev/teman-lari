@@ -133,6 +133,13 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('get_started_button')));
         await tester.pumpAndSettle();
 
+        // Enter valid birth date on Step 2
+        await tester.enterText(
+          find.byKey(const ValueKey('dob_input')),
+          '1996-05-15',
+        );
+        await tester.pumpAndSettle();
+
         // Tap Complete Setup on Step 2
         await tester.tap(
           find.byKey(const ValueKey('complete_onboarding_button')),

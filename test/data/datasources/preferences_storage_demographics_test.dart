@@ -153,5 +153,63 @@ void main() {
       await storage.setCompletedOnboarding(false);
       expect(await storage.hasCompletedOnboarding(), isFalse);
     });
+
+    test('getDateOfBirth returns saved DOB', () async {
+      expect(await storage.getDateOfBirth(), isNull);
+      await storage.saveDateOfBirth('1996-05-15');
+      expect(await storage.getDateOfBirth(), '1996-05-15');
+    });
+  });
+
+  group('Tanaka Max HR Formula & Age Calculation', () {
+    test(
+      'calculateTanakaMaxHr computes expected bpm for known benchmark ages',
+      () {
+        // Age 20: 208 - (0.7 * 20) = 194 bpm
+        expect(calculateTanakaMaxHr(20), 194);
+        expect(PreferencesStorage.calculateTanakaMaxHr(20), 194);
+
+        // Age 30: 208 - (0.7 * 30) = 187 bpm
+        expect(calculateTanakaMaxHr(30), 187);
+        expect(PreferencesStorage.calculateTanakaMaxHr(30), 187);
+
+        // Age 45: 208 - (0.7 * 45) = 176.5 -> 177 bpm
+        expect(calculateTanakaMaxHr(45), 177);
+        expect(PreferencesStorage.calculateTanakaMaxHr(45), 177);
+      },
+    );
+
+    test('calculateTanakaMaxHr handles boundary ages', () {
+      // Age 5: 208 - (0.7 * 5) = 204.5 -> 205 bpm
+      expect(calculateTanakaMaxHr(5), 205);
+
+      // Age 50: 208 - (0.7 * 50) = 173 bpm
+      expect(calculateTanakaMaxHr(50), 173);
+
+      // Age 120: 208 - (0.7 * 120) = 124 bpm
+      expect(calculateTanakaMaxHr(120), 124);
+    });
+
+    test('calculateAge computes exact elapsed years given reference date', () {
+      final refDate = DateTime(2026, 10, 12);
+
+      // Birthday already occurred this year
+      expect(
+        PreferencesStorage.calculateAge(DateTime(1996, 5, 15), refDate),
+        30,
+      );
+
+      // Birthday is today
+      expect(
+        PreferencesStorage.calculateAge(DateTime(1996, 10, 12), refDate),
+        30,
+      );
+
+      // Birthday has not yet occurred this year
+      expect(
+        PreferencesStorage.calculateAge(DateTime(1996, 11, 20), refDate),
+        29,
+      );
+    });
   });
 }
