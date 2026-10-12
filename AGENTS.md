@@ -4,6 +4,8 @@
 
 - Codegen: `dart run build_runner build --delete-conflicting-outputs`
 - Formatting: ALWAYS run `dart format .` before committing code.
+- Standards Guardrail: `dart run tool/check_standards.dart` enforces mechanical rules (!, length <= 50 lines, checks in tests).
+- TDD Loop: Target specific test files (`flutter test test/path/to/specific_test.dart`) during red-green cycles; run full `flutter test` only before commits or at merge boundaries.
 
 ## Non-Obvious Rules
 
@@ -12,6 +14,7 @@
 
 ## Domain-Specific Docs
 
+- Routing: Top-level `GoRouter` and application route table reside in `lib/main.dart`.
 - Design tokens: `docs/design.md`
 - Training plan architecture: `docs/training_plan_architecture.md`
 - Flutter rules: `docs/flutter_rules.md`

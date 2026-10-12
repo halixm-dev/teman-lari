@@ -9,6 +9,7 @@
 ## Architecture & Structure
 * **Entry:** Standard `lib/main.dart`.
 * **Layers:** Presentation (Widgets), Domain (Logic), Data (Repo/API).
+* **Domain Logic Separation:** Pure physiological algorithms (HR zones, Tanaka equation, TSS estimation, age derivation) must reside in `lib/domain/usecases/`, never inside `lib/data/datasources/`.
 * **Features:** Group by feature (e.g., `lib/features/login/`) for scalable apps.
 * **SOLID:** Strictly enforced.
 * **State Management:**
