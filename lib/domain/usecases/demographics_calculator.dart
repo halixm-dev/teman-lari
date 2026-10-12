@@ -2,6 +2,12 @@
 class DemographicsCalculator {
   const DemographicsCalculator._();
 
+  /// Calculates estimated Maximum Heart Rate using the Fox formula:
+  /// HR_max = 220 - age
+  static int calculateFoxMaxHr(int age) {
+    return 220 - age;
+  }
+
   /// Calculates estimated Maximum Heart Rate using the clinically validated Tanaka formula:
   /// HR_max = round(208 - 0.7 * age)
   static int calculateTanakaMaxHr(int age) {

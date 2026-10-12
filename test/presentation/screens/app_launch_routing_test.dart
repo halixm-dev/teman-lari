@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:checks/checks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -102,7 +103,7 @@ void main() {
 
         // Verifies storage flag was set to true
         final storage = PreferencesStorage();
-        expect(await storage.hasCompletedOnboarding(), isTrue);
+        check(await storage.hasCompletedOnboarding()).isTrue();
 
         // Verifies transition to MainNavigationScreen and DashboardScreen
         expect(find.byType(MainNavigationScreen), findsOneWidget);
@@ -155,7 +156,7 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
 
         final storage = PreferencesStorage();
-        expect(await storage.hasCompletedOnboarding(), isTrue);
+        check(await storage.hasCompletedOnboarding()).isTrue();
 
         expect(find.byType(MainNavigationScreen), findsOneWidget);
         expect(find.byType(DashboardScreen), findsOneWidget);

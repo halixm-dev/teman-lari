@@ -201,42 +201,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final nameText = _athleteNameController.text.trim();
 
     try {
-      final preferencesNotifier = ref.read(hrPreferencesProvider.notifier);
-      final preferencesStorage = ref.read(preferencesStorageProvider);
+      await _persistAthleteName(nameText);
+      await _persistHrPreferences(restingText, maxText, paceText);
 
-      final nameToSave = nameText.isNotEmpty ? nameText : 'Runner';
-      await preferencesStorage.saveAthleteName(nameToSave);
-      _storedAthleteName = nameToSave;
-      ref.invalidate(athleteNameProvider);
-
-      if (restingText.isEmpty) {
-        await preferencesNotifier.clearRestingHr();
-      } else {
-        final parsed = int.tryParse(restingText);
-        if (parsed != null) {
-          await preferencesNotifier.saveRestingHr(parsed);
-        }
-      }
-
-      if (maxText.isEmpty) {
-        await preferencesNotifier.clearMaxHr();
-      } else {
-        final parsed = int.tryParse(maxText);
-        if (parsed != null) {
-          await preferencesNotifier.saveMaxHr(parsed);
-        }
-      }
-
-      if (paceText.isEmpty) {
-        await preferencesNotifier.clearThresholdPace();
-      } else {
-        final parsed = ThresholdPaceUtils.parsePace(paceText);
-        if (parsed != null && ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
-          await preferencesNotifier.saveThresholdPace(parsed);
-        }
-      }
-
-      // Reload stored values to reset "Save Changes" button state
       final prefs = await ref.read(hrPreferencesProvider.future);
       _storedRestingHr = prefs.restingHr;
       _storedMaxHr = prefs.maxHr;
@@ -259,6 +226,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to save settings: $e')));
+      }
+    }
+  }
+
+  Future<void> _persistAthleteName(String nameText) async {
+    final preferencesStorage = ref.read(preferencesStorageProvider);
+    final nameToSave = nameText.isNotEmpty ? nameText : 'Runner';
+    await preferencesStorage.saveAthleteName(nameToSave);
+    _storedAthleteName = nameToSave;
+    ref.invalidate(athleteNameProvider);
+  }
+
+  Future<void> _persistHrPreferences(
+    String restingText,
+    String maxText,
+    String paceText,
+  ) async {
+    final notifier = ref.read(hrPreferencesProvider.notifier);
+    if (restingText.isEmpty) {
+      await notifier.clearRestingHr();
+    } else {
+      final parsed = int.tryParse(restingText);
+      if (parsed != null) await notifier.saveRestingHr(parsed);
+    }
+
+    if (maxText.isEmpty) {
+      await notifier.clearMaxHr();
+    } else {
+      final parsed = int.tryParse(maxText);
+      if (parsed != null) await notifier.saveMaxHr(parsed);
+    }
+
+    if (paceText.isEmpty) {
+      await notifier.clearThresholdPace();
+    } else {
+      final parsed = ThresholdPaceUtils.parsePace(paceText);
+      if (parsed != null && ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
+        await notifier.saveThresholdPace(parsed);
       }
     }
   }
@@ -432,29 +437,27 @@ class _ProfileCard extends StatelessWidget {
             TextField(
               key: const ValueKey('settings_athlete_name_input'),
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Athlete Name',
-                hintText: 'e.g. Alex, Budi',
-                prefixIcon: Icon(
-                  Icons.person_outline,
-                  color: AppColors.gray500,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  borderSide: BorderSide(
-                    color: AppColors.brandOrange,
-                    width: 2,
-                  ),
-                ),
-                isDense: true,
-              ),
+              decoration: _buildInputDecoration(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration() {
+    return const InputDecoration(
+      labelText: 'Athlete Name',
+      hintText: 'e.g. Alex, Budi',
+      prefixIcon: Icon(Icons.person_outline, color: AppColors.gray500),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: AppColors.brandOrange, width: 2),
+      ),
+      isDense: true,
     );
   }
 }

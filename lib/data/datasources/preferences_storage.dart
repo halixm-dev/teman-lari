@@ -15,10 +15,20 @@ class HrPreferences {
     this.thresholdPaceSeconds,
   });
 
-  int get effectiveMaxHr => maxHr ?? (age != null ? (220 - age!) : 190);
-  Duration? get thresholdPace => thresholdPaceSeconds != null
-      ? Duration(seconds: thresholdPaceSeconds!)
-      : null;
+  int get effectiveMaxHr {
+    final fixedMax = maxHr;
+    if (fixedMax != null) return fixedMax;
+    final athleteAge = age;
+    if (athleteAge != null) {
+      return DemographicsCalculator.calculateFoxMaxHr(athleteAge);
+    }
+    return 190;
+  }
+
+  Duration? get thresholdPace {
+    final pace = thresholdPaceSeconds;
+    return pace != null ? Duration(seconds: pace) : null;
+  }
 }
 
 class PreferencesStorage {
