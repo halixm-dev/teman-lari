@@ -6,7 +6,9 @@ import '../../core/utils/responsive.dart';
 import '../../domain/entities/running_stats.dart';
 import '../providers/activities_provider.dart';
 import '../providers/preferences_provider.dart';
+import '../theme/app_colors.dart';
 import '../widgets/fitness_form_card.dart';
+import '../widgets/manual_run_entry_sheet.dart';
 import '../widgets/recent_activities_list.dart';
 import '../widgets/today_workout_card.dart';
 import '../widgets/weekly_volume_chart.dart';
@@ -24,11 +26,25 @@ class DashboardScreen extends ConsumerWidget {
         title: Text(_greeting(nameAsync.whenOrNull(data: (n) => n))),
         actions: [
           IconButton(
+            key: const Key('dashboard_log_manual_run_button'),
+            icon: const Icon(Icons.add_task_outlined),
+            tooltip: 'Log Manual Run',
+            onPressed: () => showManualRunEntrySheet(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh activities',
             onPressed: () => ref.read(activitiesProvider.notifier).refresh(),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        key: const Key('dashboard_log_manual_run_fab'),
+        onPressed: () => showManualRunEntrySheet(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Log Manual Run'),
+        backgroundColor: AppColors.brandOrange,
+        foregroundColor: Colors.white,
       ),
       body: ConstrainedContent(
         child: activities.when(

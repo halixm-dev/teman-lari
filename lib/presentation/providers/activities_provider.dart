@@ -1,4 +1,5 @@
 import 'dart:isolate';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -79,6 +80,53 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
   }
 
   Future<void> saveCompletedRun(Activity activity) async {
+    final repo = ref.read(activityRepositoryProvider);
+    await repo.saveActivity(activity);
+    if (ref.mounted) {
+      state = await AsyncValue.guard(
+        () => repo.getAllActivities(monthsBack: 12),
+      );
+    }
+  }
+
+  Future<void> addManualActivity({
+    required DateTime date,
+    required double distanceKm,
+    required Duration duration,
+    required double perceivedExertion,
+    String? name,
+    String? shoeId,
+  }) async {
+    final tss =
+        (duration.inSeconds / 3600.0) *
+        pow(perceivedExertion / 10.0, 2) *
+        100.0;
+    final TrainingLoad load;
+    if (tss < 30) {
+      load = TrainingLoad.easy;
+    } else if (tss < 60) {
+      load = TrainingLoad.moderate;
+    } else if (tss < 90) {
+      load = TrainingLoad.hard;
+    } else {
+      load = TrainingLoad.veryHard;
+    }
+    final paceSeconds = distanceKm > 0
+        ? (duration.inSeconds / distanceKm).round()
+        : 300;
+    final activity = Activity(
+      id: -DateTime.now().millisecondsSinceEpoch,
+      name: name ?? 'Run',
+      date: date,
+      type: ActivityType.run,
+      distanceKm: distanceKm,
+      movingTime: duration,
+      pace: Duration(seconds: paceSeconds),
+      elevationGainM: 0.0,
+      trainingLoad: load,
+      perceivedExertion: perceivedExertion,
+      isLocal: true,
+    );
     final repo = ref.read(activityRepositoryProvider);
     await repo.saveActivity(activity);
     if (ref.mounted) {
