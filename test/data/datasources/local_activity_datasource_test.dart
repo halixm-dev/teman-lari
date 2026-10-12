@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:checks/checks.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:teman_lari/data/datasources/local_activity_datasource.dart';
 import 'package:teman_lari/data/models/activity_model.dart';
@@ -143,5 +143,257 @@ void main() {
       final cachedStreams = await dataSource.getCachedHeartRateStreams();
       check(cachedStreams).isEmpty();
     });
+  });
+
+  group('LocalActivityDataSource - Zero-TTL Permanent SSOT (getAllActivities)', () {
+    test('getAllActivities returns empty list when box is empty', () async {
+      final activities = await dataSource.getAllActivities();
+      check(activities).isNotNull();
+      check(activities).isEmpty();
+    });
+
+    test(
+      'getAllActivities returns activities indefinitely even when cache is older than 1 hour (Zero-TTL)',
+      () async {
+        final box = await dataSource.activitiesBox;
+        final twoDaysAgo = DateTime.now()
+            .subtract(const Duration(days: 2))
+            .millisecondsSinceEpoch;
+
+        await box.put(101, {
+          'id': 101,
+          'data': jsonEncode(mockActivities[0].toJson()),
+          'synced_at': twoDaysAgo,
+        });
+
+        // Verification of TTL contrast:
+        final cached = await dataSource.getCachedActivities();
+        check(cached).isNull();
+
+        // Zero-TTL permanent SSOT retrieves the record:
+        final allActivities = await dataSource.getAllActivities();
+        check(allActivities).length.equals(1);
+        check(allActivities.first.id).equals(101);
+        check(allActivities.first.name).equals('Morning Run');
+      },
+    );
+
+    test(
+      'getAllActivities returns activities sorted in descending ID order',
+      () async {
+        await dataSource.saveActivities(mockActivities); // IDs: 101, 102
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(2);
+        check(activities[0].id).equals(102);
+        check(activities[1].id).equals(101);
+      },
+    );
+
+    test(
+      'getAllActivities preserves negative local IDs alongside positive remote IDs',
+      () async {
+        const localActivity = ActivityModel(
+          id: -1001,
+          name: 'Local Offline Run',
+          type: 'Run',
+          distance: 6000.0,
+          movingTime: 1800,
+          elapsedTime: 1850,
+          totalElevationGain: 30.0,
+          startDate: '2026-05-19T07:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.0,
+        );
+
+        await dataSource.saveActivities([...mockActivities, localActivity]);
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(3);
+        check(
+          activities.map((a) => a.id).toList(),
+        ).deepEquals([102, 101, -1001]);
+      },
+    );
+  });
+
+  group('LocalActivityDataSource - Single Activity Operations', () {
+    test('saveActivity successfully stores a single activity', () async {
+      const single = ActivityModel(
+        id: -2001,
+        name: 'Solo Treadmill Run',
+        type: 'Run',
+        distance: 4000.0,
+        movingTime: 1200,
+        elapsedTime: 1200,
+        totalElevationGain: 0.0,
+        startDate: '2026-05-22T06:00:00Z',
+        averageSpeed: 3.33,
+        maxSpeed: 3.8,
+      );
+
+      await dataSource.saveActivity(single);
+
+      final activities = await dataSource.getAllActivities();
+      check(activities).length.equals(1);
+      check(activities.first.id).equals(-2001);
+      check(activities.first.name).equals('Solo Treadmill Run');
+      check(activities.first.distance).equals(4000.0);
+    });
+
+    test(
+      'saveActivity does not overwrite other activities in the box',
+      () async {
+        await dataSource.saveActivities(mockActivities);
+
+        const single = ActivityModel(
+          id: -2002,
+          name: 'Track Intervals',
+          type: 'Run',
+          distance: 5000.0,
+          movingTime: 1300,
+          elapsedTime: 1400,
+          totalElevationGain: 10.0,
+          startDate: '2026-05-22T08:00:00Z',
+          averageSpeed: 3.85,
+          maxSpeed: 5.2,
+        );
+
+        await dataSource.saveActivity(single);
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(3);
+        check(activities.any((a) => a.id == 101)).isTrue();
+        check(activities.any((a) => a.id == 102)).isTrue();
+        check(activities.any((a) => a.id == -2002)).isTrue();
+      },
+    );
+
+    test(
+      'updateActivity updates existing activity data while preserving its ID',
+      () async {
+        await dataSource.saveActivity(mockActivities[0]); // ID 101
+
+        final updated = mockActivities[0].copyWith(
+          name: 'Morning Run (Calibrated)',
+          distance: 5200.0,
+          sufferScore: 40,
+        );
+
+        await dataSource.updateActivity(updated);
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(1);
+        check(activities.first.id).equals(101);
+        check(activities.first.name).equals('Morning Run (Calibrated)');
+        check(activities.first.distance).equals(5200.0);
+        check(activities.first.sufferScore).equals(40);
+      },
+    );
+
+    test(
+      'updateActivity does not modify other activities in the box',
+      () async {
+        await dataSource.saveActivities(mockActivities); // 101, 102
+
+        final updated101 = mockActivities[0].copyWith(name: 'Updated 101');
+
+        await dataSource.updateActivity(updated101);
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(2);
+
+        final a101 = activities.firstWhere((a) => a.id == 101);
+        check(a101.name).equals('Updated 101');
+
+        final a102 = activities.firstWhere((a) => a.id == 102);
+        check(a102.name).equals('Evening Jog');
+      },
+    );
+
+    test(
+      'updateActivity upserts activity when not previously present',
+      () async {
+        const unrecorded = ActivityModel(
+          id: 303,
+          name: 'Spontaneous Run',
+          type: 'Run',
+          distance: 7000.0,
+          movingTime: 2100,
+          elapsedTime: 2200,
+          totalElevationGain: 40.0,
+          startDate: '2026-05-23T10:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.1,
+        );
+
+        await dataSource.updateActivity(unrecorded);
+
+        final activities = await dataSource.getAllActivities();
+        check(activities).length.equals(1);
+        check(activities.first.id).equals(303);
+        check(activities.first.name).equals('Spontaneous Run');
+      },
+    );
+
+    test(
+      'updateLocalActivityId replaces negative local ID with remote ID and preserves heart rate stream',
+      () async {
+        const local = ActivityModel(
+          id: -100,
+          name: 'Offline Run',
+          type: 'Run',
+          distance: 5000.0,
+          movingTime: 1500,
+          elapsedTime: 1550,
+          totalElevationGain: 20.0,
+          startDate: '2026-05-20T08:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.0,
+        );
+        await dataSource.saveActivity(local);
+        await dataSource.saveHeartRateStream(-100, [140.0, 150.0]);
+
+        final updated = local.copyWith(id: 500, name: 'Uploaded Run');
+        await dataSource.updateLocalActivityId(-100, updated);
+
+        final all = await dataSource.getAllActivities();
+        check(all.length).equals(1);
+        check(all.first.id).equals(500);
+        check(all.first.name).equals('Uploaded Run');
+
+        final streams = await dataSource.getAllHeartRateStreams();
+        check(streams).containsKey(500);
+        check(streams[500]!).deepEquals([140.0, 150.0]);
+        check(streams).not((it) => it.containsKey(-100));
+      },
+    );
+
+    test(
+      'smartMergeActivities additively retains local-only runs across remote sync',
+      () async {
+        const local = ActivityModel(
+          id: -101,
+          name: 'Unsynced Local Run',
+          type: 'Run',
+          distance: 4000.0,
+          movingTime: 1200,
+          elapsedTime: 1250,
+          totalElevationGain: 10.0,
+          startDate: '2026-05-22T08:00:00Z',
+          averageSpeed: 3.33,
+          maxSpeed: 4.0,
+        );
+        await dataSource.saveActivity(local);
+
+        await dataSource.smartMergeActivities(mockActivities);
+
+        final all = await dataSource.getAllActivities();
+        check(all.length).equals(3);
+        check(all.any((a) => a.id == -101)).isTrue();
+        check(all.any((a) => a.id == 101)).isTrue();
+        check(all.any((a) => a.id == 102)).isTrue();
+      },
+    );
   });
 }

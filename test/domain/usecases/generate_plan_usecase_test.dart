@@ -119,7 +119,7 @@ void main() {
       expect(plan.goal, 'No data available');
       expect(
         plan.description,
-        'Connect Strava and complete some runs to generate a plan.',
+        'Track or log runs to generate your personalized training plan.',
       );
     });
   });
