@@ -73,12 +73,14 @@ class FakeStravaActivityDataSource implements StravaActivityDataSource {
 
 class FakeLocalActivityDataSource extends LocalActivityDataSource {
   List<ActivityModel> storedActivities = [];
+  Map<int, List<double>> storedStreams = {};
   int getAllActivitiesCallCount = 0;
   int saveActivitiesCallCount = 0;
   int saveActivityCallCount = 0;
   int updateActivityCallCount = 0;
   int smartMergeCallCount = 0;
   int updateLocalActivityIdCallCount = 0;
+  int saveHeartRateStreamCallCount = 0;
 
   @override
   Future<List<ActivityModel>> getAllActivities() async {
@@ -134,8 +136,27 @@ class FakeLocalActivityDataSource extends LocalActivityDataSource {
   }
 
   @override
+  Future<void> saveHeartRateStream(int activityId, List<double> data) async {
+    saveHeartRateStreamCallCount++;
+    storedStreams[activityId] = List.from(data);
+  }
+
+  @override
+  Future<Map<int, List<double>>> getCachedHeartRateStreams({
+    bool checkTtl = true,
+  }) async {
+    return Map.from(storedStreams);
+  }
+
+  @override
+  Future<Map<int, List<double>>> getAllHeartRateStreams() async {
+    return Map.from(storedStreams);
+  }
+
+  @override
   Future<void> clearCache() async {
     storedActivities.clear();
+    storedStreams.clear();
   }
 }
 
@@ -458,6 +479,31 @@ void main() {
         activities.firstWhere((a) => a.id == 4).trainingLoad,
       ).equals(TrainingLoad.veryHard);
     });
+
+    test(
+      'maps perceivedExertion from ActivityModel to Activity entity',
+      () async {
+        fakeTokens.tokens = null;
+        fakeLocal.storedActivities = [
+          const ActivityModel(
+            id: 99,
+            name: 'Manual RPE Run',
+            type: 'Run',
+            distance: 5000.0,
+            movingTime: 1500,
+            elapsedTime: 1500,
+            totalElevationGain: 10.0,
+            startDate: '2026-05-15T08:00:00Z',
+            averageSpeed: 3.33,
+            maxSpeed: 4.0,
+            perceivedExertion: 7.5,
+          ),
+        ];
+
+        final activities = await repository.getAllActivities();
+        check(activities.first.perceivedExertion).equals(7.5);
+      },
+    );
   });
 
   group('ActivityRepositoryImpl - Authenticated Flow & Remote Errors', () {
@@ -684,5 +730,150 @@ void main() {
         },
       );
     });
+  });
+
+  group('ActivityRepositoryImpl - Zero-TTL SSOT & saveActivity (Ticket 01)', () {
+    late FakeStravaActivityDataSource fakeRemote;
+    late FakeLocalActivityDataSource fakeLocal;
+    late FakePreferencesStorage fakePrefs;
+    late FakeTokenStorage fakeTokens;
+    late ActivityRepositoryImpl repository;
+
+    setUp(() {
+      fakeRemote = FakeStravaActivityDataSource();
+      fakeLocal = FakeLocalActivityDataSource();
+      fakePrefs = FakePreferencesStorage();
+      fakeTokens = FakeTokenStorage();
+
+      repository = ActivityRepositoryImpl(
+        remoteDataSource: fakeRemote,
+        localDataSource: fakeLocal,
+        preferencesStorage: fakePrefs,
+        tokenStorage: fakeTokens,
+      );
+    });
+
+    test(
+      'saveActivity maps domain Activity to ActivityModel and commits to local store with negative ID preserved',
+      () async {
+        final activity = Activity(
+          id: -12345678,
+          name: 'Track Workout',
+          date: DateTime.utc(2026, 5, 20, 6, 30),
+          type: ActivityType.run,
+          distanceKm: 6.0,
+          movingTime: const Duration(minutes: 30),
+          pace: const Duration(minutes: 5),
+          elevationGainM: 15.0,
+          trainingLoad: TrainingLoad.moderate,
+          avgHeartRate: 155.0,
+          maxHeartRate: 175.0,
+          avgCadence: 86.0,
+          sufferScore: 35,
+          perceivedExertion: 8.0,
+        );
+
+        await repository.saveActivity(activity);
+
+        check(fakeLocal.saveActivityCallCount).equals(1);
+        check(fakeLocal.storedActivities.length).equals(1);
+
+        final saved = fakeLocal.storedActivities.first;
+        check(saved.id).equals(-12345678);
+        check(saved.name).equals('Track Workout');
+        check(saved.type).equals('Run');
+        check(saved.distance).equals(6000.0);
+        check(saved.movingTime).equals(1800);
+        check(saved.elapsedTime).equals(1800);
+        check(saved.totalElevationGain).equals(15.0);
+        check(
+          saved.startDate,
+        ).equals(DateTime.utc(2026, 5, 20, 6, 30).toIso8601String());
+        check(saved.averageSpeed).equals(6000.0 / 1800);
+        check(saved.averageHeartrate).equals(155.0);
+        check(saved.maxHeartrate).equals(175.0);
+        check(saved.averageCadence).equals(86.0);
+        check(saved.sufferScore).equals(35);
+        check(saved.perceivedExertion).equals(8.0);
+        check(saved.hasHeartrate).isTrue();
+      },
+    );
+
+    test(
+      'saveActivity persists heartRateData stream to local store when present',
+      () async {
+        final activity = Activity(
+          id: -999,
+          name: 'Heart Rate Session',
+          date: DateTime.utc(2026, 5, 21, 7, 0),
+          type: ActivityType.run,
+          distanceKm: 5.0,
+          movingTime: const Duration(minutes: 25),
+          pace: const Duration(minutes: 5),
+          elevationGainM: 0.0,
+          trainingLoad: TrainingLoad.easy,
+          heartRateData: [130.0, 135.0, 140.0, 145.0],
+        );
+
+        await repository.saveActivity(activity);
+
+        check(fakeLocal.saveHeartRateStreamCallCount).equals(1);
+        check(fakeLocal.storedStreams).containsKey(-999);
+        check(
+          fakeLocal.storedStreams[-999]!,
+        ).deepEquals([130.0, 135.0, 140.0, 145.0]);
+      },
+    );
+
+    test(
+      'saveActivity does not call saveHeartRateStream when heartRateData is null or empty',
+      () async {
+        final activity = Activity(
+          id: -888,
+          name: 'No HR Session',
+          date: DateTime.utc(2026, 5, 21, 7, 0),
+          type: ActivityType.run,
+          distanceKm: 4.0,
+          movingTime: const Duration(minutes: 20),
+          pace: const Duration(minutes: 5),
+          elevationGainM: 0.0,
+          trainingLoad: TrainingLoad.easy,
+          heartRateData: null,
+        );
+
+        await repository.saveActivity(activity);
+
+        check(fakeLocal.saveActivityCallCount).equals(1);
+        check(fakeLocal.saveHeartRateStreamCallCount).equals(0);
+      },
+    );
+
+    test(
+      'getAllActivities returns activities saved days/weeks ago without outbound remote calls when unauthenticated (Zero-TTL)',
+      () async {
+        fakeTokens.tokens = null; // Unauthenticated / guest / offline
+        fakeLocal.storedActivities = [
+          const ActivityModel(
+            id: 10,
+            name: 'Historical Run',
+            type: 'Run',
+            distance: 5000.0,
+            movingTime: 1500,
+            elapsedTime: 1500,
+            totalElevationGain: 10.0,
+            startDate: '2026-04-01T08:00:00Z',
+            averageSpeed: 3.33,
+            maxSpeed: 4.0,
+          ),
+        ];
+
+        final result = await repository.getAllActivities();
+
+        check(result.length).equals(1);
+        check(result.first.id).equals(10);
+        check(result.first.name).equals('Historical Run');
+        check(fakeRemote.getAllActivitiesCallCount).equals(0);
+      },
+    );
   });
 }

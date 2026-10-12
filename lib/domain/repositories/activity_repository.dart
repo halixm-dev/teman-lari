@@ -5,4 +5,5 @@ abstract class ActivityRepository {
   Future<void> refreshActivities({int monthsBack = 12});
   Future<Map<int, List<double>>> getHeartRateStreams(List<int> activityIds);
   Future<Activity> uploadActivity(int localId);
+  Future<void> saveActivity(Activity activity);
 }

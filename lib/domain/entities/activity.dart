@@ -17,6 +17,7 @@ class Activity {
   final int? sufferScore;
   final TrainingLoad trainingLoad;
   final List<double>? heartRateData;
+  final double? perceivedExertion;
   final bool? _isLocal;
 
   const Activity({
@@ -34,6 +35,7 @@ class Activity {
     this.avgCadence,
     this.sufferScore,
     this.heartRateData,
+    this.perceivedExertion,
     bool? isLocal,
   }) : _isLocal = isLocal;
 

@@ -58,6 +58,11 @@ class FakeActivityRepository implements ActivityRepository {
     activities = [uploaded];
     return uploaded;
   }
+
+  @override
+  Future<void> saveActivity(Activity activity) async {
+    activities.add(activity);
+  }
 }
 
 void main() {

@@ -200,6 +200,66 @@ class ActivityRepositoryImpl implements ActivityRepository {
   }
 
   @override
+  Future<void> saveActivity(Activity activity) async {
+    String typeString;
+    switch (activity.type) {
+      case ActivityType.run:
+        typeString = 'Run';
+        break;
+      case ActivityType.ride:
+        typeString = 'Ride';
+        break;
+      case ActivityType.swim:
+        typeString = 'Swim';
+        break;
+      case ActivityType.workout:
+        typeString = 'Workout';
+        break;
+      case ActivityType.walk:
+        typeString = 'Walk';
+        break;
+      case ActivityType.other:
+        typeString = 'Other';
+        break;
+    }
+
+    final distanceMeters = activity.distanceKm * 1000.0;
+    final movingSeconds = activity.movingTime.inSeconds;
+    final avgSpeed = movingSeconds > 0 ? distanceMeters / movingSeconds : 0.0;
+
+    final model = ActivityModel(
+      id: activity.id,
+      name: activity.name,
+      type: typeString,
+      distance: distanceMeters,
+      movingTime: movingSeconds,
+      elapsedTime: movingSeconds,
+      totalElevationGain: activity.elevationGainM,
+      startDate: activity.date.toUtc().toIso8601String(),
+      averageSpeed: avgSpeed,
+      maxSpeed: avgSpeed,
+      averageHeartrate: activity.avgHeartRate,
+      maxHeartrate: activity.maxHeartRate,
+      averageCadence: activity.avgCadence,
+      sufferScore: activity.sufferScore,
+      hasHeartrate:
+          activity.avgHeartRate != null ||
+          (activity.heartRateData != null &&
+              activity.heartRateData!.isNotEmpty),
+      perceivedExertion: activity.perceivedExertion,
+    );
+
+    await localDataSource.saveActivity(model);
+
+    if (activity.heartRateData != null && activity.heartRateData!.isNotEmpty) {
+      await localDataSource.saveHeartRateStream(
+        activity.id,
+        activity.heartRateData!,
+      );
+    }
+  }
+
+  @override
   Future<Map<int, List<double>>> getHeartRateStreams(
     List<int> activityIds,
   ) async {
@@ -314,6 +374,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         maxHeartRate: model.maxHeartrate,
         avgCadence: model.averageCadence,
         sufferScore: model.sufferScore,
+        perceivedExertion: model.perceivedExertion,
       );
     }).toList();
   }
