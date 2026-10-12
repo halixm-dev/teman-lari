@@ -164,7 +164,7 @@ final class ActivitiesNotifierProvider
         argument: null,
         retry: null,
         name: r'activitiesProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -178,7 +178,7 @@ final class ActivitiesNotifierProvider
 }
 
 String _$activitiesNotifierHash() =>
-    r'd9af4e248d906ebb7dd2fbf193850e0c96be630c';
+    r'a3ab6aee1680d8a50159bdfdae327d8c01331043';
 
 abstract class _$ActivitiesNotifier extends $AsyncNotifier<List<Activity>> {
   FutureOr<List<Activity>> build();

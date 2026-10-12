@@ -34,7 +34,7 @@ AnalyzeRunsUseCase analyzeRunsUseCase(Ref ref) {
   return AnalyzeRunsUseCase();
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 class ActivitiesNotifier extends _$ActivitiesNotifier {
   @override
   Future<List<Activity>> build() async {
@@ -50,6 +50,7 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
     } catch (_) {
       // Non-blocking: remote failures or rate limits must not corrupt or block local SSOT
     }
+    if (!ref.mounted) return;
     state = await AsyncValue.guard(() => repo.getAllActivities(monthsBack: 12));
   }
 
@@ -58,16 +59,22 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
     try {
       await repo.refreshActivities(monthsBack: 12);
     } finally {
-      state = await AsyncValue.guard(
-        () => repo.getAllActivities(monthsBack: 12),
-      );
+      if (ref.mounted) {
+        state = await AsyncValue.guard(
+          () => repo.getAllActivities(monthsBack: 12),
+        );
+      }
     }
   }
 
   Future<Activity> uploadActivity(int localId) async {
     final repo = ref.read(activityRepositoryProvider);
     final uploaded = await repo.uploadActivity(localId);
-    state = await AsyncValue.guard(() => repo.getAllActivities(monthsBack: 12));
+    if (ref.mounted) {
+      state = await AsyncValue.guard(
+        () => repo.getAllActivities(monthsBack: 12),
+      );
+    }
     return uploaded;
   }
 }
