@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
+@Deprecated(
+  'Use StravaIntegrationCard instead. This widget will be removed in a future release.',
+)
 class DisconnectStravaCard extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -13,8 +16,7 @@ class DisconnectStravaCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Disconnect Strava Account',
-      hint:
-          'Removes your linked Strava connection and purges local running history',
+      hint: 'Removes your linked Strava connection without deleting local data',
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(

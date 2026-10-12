@@ -227,7 +227,7 @@ class _PlanErrorView extends StatelessWidget {
           const Icon(Icons.error_outline, size: 64, color: Colors.red),
           const SizedBox(height: 16),
           const Text(
-            'Could not generate your training plan.\nMake sure you\'re connected to Strava.',
+            'Could not generate your training plan.\nPlease track some runs or review your settings.',
             textAlign: TextAlign.center,
           ),
         ],

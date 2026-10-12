@@ -15,8 +15,9 @@ import 'presentation/screens/settings_screen.dart';
 import 'presentation/theme/app_theme.dart';
 
 final _router = GoRouter(
+  initialLocation: '/dashboard',
   routes: [
-    GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/', redirect: (context, state) => '/dashboard'),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
       path: '/dashboard',
@@ -46,7 +47,9 @@ void main() async {
 }
 
 class TemanLariApp extends StatelessWidget {
-  const TemanLariApp({super.key});
+  final RouterConfig<Object>? routerConfig;
+
+  const TemanLariApp({super.key, this.routerConfig});
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +59,7 @@ class TemanLariApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      routerConfig: _router,
+      routerConfig: routerConfig ?? _router,
     );
   }
 }
@@ -73,11 +76,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     ref.listen(authProvider, (previous, next) {
       if (next.isLoading) return;
-      if (next.isAuthenticated) {
-        context.go('/dashboard');
-      } else {
-        context.go('/login');
-      }
+      context.go('/dashboard');
     });
 
     return const Scaffold(body: Center(child: CircularProgressIndicator()));

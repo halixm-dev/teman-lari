@@ -52,6 +52,7 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
           weekInCycle: weekInCycle,
           userMaxHr: prefs.maxHr,
           userRestingHr: prefs.restingHr,
+          userThresholdPaceSeconds: prefs.thresholdPaceSeconds,
         )
       : await Isolate.run(
           () => generateUseCase.generate(
@@ -59,6 +60,7 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
             weekInCycle: weekInCycle,
             userMaxHr: prefs.maxHr,
             userRestingHr: prefs.restingHr,
+            userThresholdPaceSeconds: prefs.thresholdPaceSeconds,
           ),
         );
 }

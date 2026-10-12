@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/responsive.dart';
-import '../providers/auth_provider.dart';
 import '../providers/preferences_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/settings/about_card.dart';
-import '../widgets/settings/disconnect_strava_card.dart';
 import '../widgets/settings/heart_rate_card.dart';
 import '../widgets/settings/save_button.dart';
+import '../widgets/settings/strava_integration_card.dart';
 import '../widgets/settings/zones_preview_card.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -23,12 +21,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _restingHrController = TextEditingController();
   final _maxHrController = TextEditingController();
+  final _thresholdPaceController = TextEditingController();
   String? _restingHrError;
   String? _maxHrError;
+  String? _thresholdPaceError;
   int? _storedAge;
 
   int? _storedRestingHr;
   int? _storedMaxHr;
+  int? _storedThresholdPace;
   bool _isSaving = false;
   bool _showSuccess = false;
 
@@ -38,14 +39,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _load();
     _restingHrController.addListener(_onFieldChanged);
     _maxHrController.addListener(_onFieldChanged);
+    _thresholdPaceController.addListener(_onFieldChanged);
   }
 
   @override
   void dispose() {
     _restingHrController.removeListener(_onFieldChanged);
     _maxHrController.removeListener(_onFieldChanged);
+    _thresholdPaceController.removeListener(_onFieldChanged);
     _restingHrController.dispose();
     _maxHrController.dispose();
+    _thresholdPaceController.dispose();
     super.dispose();
   }
 
@@ -53,6 +57,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await ref.read(hrPreferencesProvider.future);
     _restingHrController.removeListener(_onFieldChanged);
     _maxHrController.removeListener(_onFieldChanged);
+    _thresholdPaceController.removeListener(_onFieldChanged);
 
     _restingHrController.text = prefs.restingHr.toString();
     _storedRestingHr = prefs.restingHr;
@@ -61,10 +66,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _maxHrController.text = maxStr;
     _storedMaxHr = prefs.maxHr;
 
+    _thresholdPaceController.text = ThresholdPaceUtils.formatPace(
+      prefs.thresholdPaceSeconds,
+    );
+    _storedThresholdPace = prefs.thresholdPaceSeconds;
+
     _storedAge = prefs.age;
 
     _restingHrController.addListener(_onFieldChanged);
     _maxHrController.addListener(_onFieldChanged);
+    _thresholdPaceController.addListener(_onFieldChanged);
 
     if (mounted) setState(() {});
   }
@@ -72,6 +83,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _onFieldChanged() {
     final restingText = _restingHrController.text.trim();
     final maxText = _maxHrController.text.trim();
+    final paceText = _thresholdPaceController.text.trim();
 
     String? restingError;
     if (restingText.isNotEmpty) {
@@ -98,9 +110,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     }
 
+    String? paceError;
+    if (paceText.isNotEmpty) {
+      final parsed = ThresholdPaceUtils.parsePace(paceText);
+      if (parsed == null) {
+        paceError = 'Enter pace between 2:30–12:00 /km (e.g. 5:00)';
+      } else if (!ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
+        paceError = 'Enter pace between 2:30–12:00 /km';
+      }
+    }
+
     setState(() {
       _restingHrError = restingError;
       _maxHrError = maxError;
+      _thresholdPaceError = paceError;
     });
   }
 
@@ -129,21 +152,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _hasChanges() {
     final restingText = _restingHrController.text.trim();
     final maxText = _maxHrController.text.trim();
+    final paceText = _thresholdPaceController.text.trim();
 
     final currentResting = int.tryParse(restingText);
     final currentMax = int.tryParse(maxText);
+    final currentPace = ThresholdPaceUtils.parsePace(paceText);
 
     final effectiveStoredResting = _storedRestingHr ?? 60;
     final effectiveCurrentResting = currentResting ?? 60;
 
     final changedResting = effectiveCurrentResting != effectiveStoredResting;
     final changedMax = currentMax != _storedMaxHr;
+    final changedPace = currentPace != _storedThresholdPace;
 
-    return changedResting || changedMax;
+    return changedResting || changedMax || changedPace;
   }
 
   Future<void> _saveChanges() async {
-    if (_restingHrError != null || _maxHrError != null) return;
+    if (_restingHrError != null ||
+        _maxHrError != null ||
+        _thresholdPaceError != null) {
+      return;
+    }
 
     setState(() {
       _isSaving = true;
@@ -152,6 +182,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final restingText = _restingHrController.text.trim();
     final maxText = _maxHrController.text.trim();
+    final paceText = _thresholdPaceController.text.trim();
 
     try {
       final preferencesNotifier = ref.read(hrPreferencesProvider.notifier);
@@ -174,10 +205,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         }
       }
 
+      if (paceText.isEmpty) {
+        await preferencesNotifier.clearThresholdPace();
+      } else {
+        final parsed = ThresholdPaceUtils.parsePace(paceText);
+        if (parsed != null && ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
+          await preferencesNotifier.saveThresholdPace(parsed);
+        }
+      }
+
       // Reload stored values to reset "Save Changes" button state
       final prefs = await ref.read(hrPreferencesProvider.future);
       _storedRestingHr = prefs.restingHr;
       _storedMaxHr = prefs.maxHr;
+      _storedThresholdPace = prefs.thresholdPaceSeconds;
 
       HapticFeedback.mediumImpact();
       setState(() {
@@ -245,14 +286,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             HeartRateCard(
               restingHrController: _restingHrController,
               maxHrController: _maxHrController,
+              thresholdPaceController: _thresholdPaceController,
               restingHrError: _restingHrError,
               maxHrError: _maxHrError,
+              thresholdPaceError: _thresholdPaceError,
               storedAge: _storedAge,
               saveButton: _buildSaveButton(),
               maxHrHint: _buildMaxHrHint(),
             ),
             ZonesPreviewCard(zones: _calculatePreviewZones()),
-            DisconnectStravaCard(onTap: () => _showLogoutDialog(context, ref)),
+            const _SectionHeader(
+              title: 'Integrations',
+              icon: Icons.sync_alt_rounded,
+            ),
+            const StravaIntegrationCard(),
+            const _SectionHeader(
+              title: 'About',
+              icon: Icons.info_outline_rounded,
+            ),
             const AboutCard(),
           ],
         ),
@@ -271,7 +322,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildSaveButton() {
     final hasChanges = _hasChanges();
-    final hasError = _restingHrError != null || _maxHrError != null;
+    final hasError =
+        _restingHrError != null ||
+        _maxHrError != null ||
+        _thresholdPaceError != null;
     final canSave = hasChanges && !hasError && !_isSaving;
 
     return SettingsSaveButton(
@@ -281,157 +335,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       onSave: _saveChanges,
     );
   }
+}
 
-  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) {
-        final theme = Theme.of(context);
-        final isDark = theme.brightness == Brightness.dark;
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 12,
-              bottom: MediaQuery.of(context).padding.bottom + 24,
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData? icon;
+
+  const _SectionHeader({required this.title, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 18,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.gray500,
             ),
-            child:
-                Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.surfaceTertiaryDark
-                                  : AppColors.gray300,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.danger.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.warning_amber_rounded,
-                                color: AppColors.danger,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Disconnect Strava?',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.danger,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        Text(
-                          'Are you sure you want to disconnect your Strava account?',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'This will temporarily disable real-time performance analytics, clear your active training plan schedule, and stop syncing new activities until you reconnect.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.gray700,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  HapticFeedback.lightImpact();
-                                  Navigator.pop(sheetContext);
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: isDark
-                                      ? Colors.white
-                                      : AppColors.gray900,
-                                  side: BorderSide(
-                                    color: isDark
-                                        ? AppColors.surfaceTertiaryDark
-                                        : AppColors.gray300,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Keep Connected',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () {
-                                  HapticFeedback.heavyImpact();
-                                  ref.read(authProvider.notifier).logout();
-                                  Navigator.pop(sheetContext);
-                                },
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.danger,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Disconnect',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                    .animate()
-                    .fade(duration: 250.ms)
-                    .slideY(begin: 0.08, curve: Curves.easeOutCubic),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+              letterSpacing: 0.5,
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

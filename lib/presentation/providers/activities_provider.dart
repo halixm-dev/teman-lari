@@ -25,6 +25,7 @@ ActivityRepository activityRepository(Ref ref) {
     remoteDataSource: ref.read(stravaActivityDataSourceProvider),
     localDataSource: ref.read(localActivityDataSourceProvider),
     preferencesStorage: ref.read(preferencesStorageProvider),
+    tokenStorage: ref.read(tokenStorageProvider),
   );
 }
 
@@ -43,11 +44,31 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
   }
 
   Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(
-      () =>
-          ref.read(activityRepositoryProvider).getAllActivities(monthsBack: 12),
-    );
+    final repo = ref.read(activityRepositoryProvider);
+    try {
+      await repo.refreshActivities(monthsBack: 12);
+    } catch (_) {
+      // Non-blocking: remote failures or rate limits must not corrupt or block local SSOT
+    }
+    state = await AsyncValue.guard(() => repo.getAllActivities(monthsBack: 12));
+  }
+
+  Future<void> syncWithStrava() async {
+    final repo = ref.read(activityRepositoryProvider);
+    try {
+      await repo.refreshActivities(monthsBack: 12);
+    } finally {
+      state = await AsyncValue.guard(
+        () => repo.getAllActivities(monthsBack: 12),
+      );
+    }
+  }
+
+  Future<Activity> uploadActivity(int localId) async {
+    final repo = ref.read(activityRepositoryProvider);
+    final uploaded = await repo.uploadActivity(localId);
+    state = await AsyncValue.guard(() => repo.getAllActivities(monthsBack: 12));
+    return uploaded;
   }
 }
 

@@ -103,7 +103,7 @@ final class ActivityRepositoryProvider
 }
 
 String _$activityRepositoryHash() =>
-    r'15698b476e9d32742968a27914774ab0a74ec3c3';
+    r'0fd827750c1871574182e2ab2b116920d71d8b1e';
 
 @ProviderFor(analyzeRunsUseCase)
 final analyzeRunsUseCaseProvider = AnalyzeRunsUseCaseProvider._();
@@ -178,7 +178,7 @@ final class ActivitiesNotifierProvider
 }
 
 String _$activitiesNotifierHash() =>
-    r'a865e468088998374c8102d65856ddd193f0de0c';
+    r'd9af4e248d906ebb7dd2fbf193850e0c96be630c';
 
 abstract class _$ActivitiesNotifier extends $AsyncNotifier<List<Activity>> {
   FutureOr<List<Activity>> build();
