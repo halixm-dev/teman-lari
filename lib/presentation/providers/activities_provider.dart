@@ -77,6 +77,16 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
     }
     return uploaded;
   }
+
+  Future<void> saveCompletedRun(Activity activity) async {
+    final repo = ref.read(activityRepositoryProvider);
+    await repo.saveActivity(activity);
+    if (ref.mounted) {
+      state = await AsyncValue.guard(
+        () => repo.getAllActivities(monthsBack: 12),
+      );
+    }
+  }
 }
 
 @riverpod

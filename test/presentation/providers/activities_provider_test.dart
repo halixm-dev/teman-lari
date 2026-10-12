@@ -124,6 +124,42 @@ void main() {
           expect(state.value, hasLength(1));
         },
       );
+
+      test(
+        'saveCompletedRun persists activity to repository and updates activities state',
+        () async {
+          final fakeRepo = FakeActivityRepository();
+          final container = ProviderContainer(
+            overrides: [activityRepositoryProvider.overrideWithValue(fakeRepo)],
+          );
+          addTearDown(container.dispose);
+
+          final activity = Activity(
+            id: -1728734400000,
+            name: 'Tempo Run',
+            date: DateTime(2026, 10, 12),
+            type: ActivityType.run,
+            distanceKm: 7.5,
+            movingTime: const Duration(minutes: 35),
+            pace: const Duration(seconds: 280),
+            elevationGainM: 30.0,
+            trainingLoad: TrainingLoad.moderate,
+            isLocal: true,
+          );
+
+          await container
+              .read(activitiesProvider.notifier)
+              .saveCompletedRun(activity);
+
+          expect(fakeRepo.activities, contains(activity));
+          expect(fakeRepo.activities.first.id, isNegative);
+          final state = container.read(activitiesProvider);
+          expect(state.value, hasLength(1));
+          expect(state.value!.first.id, equals(-1728734400000));
+          expect(state.value!.first.isLocal, isTrue);
+          expect(state.value!.first.name, equals('Tempo Run'));
+        },
+      );
     },
   );
 }
