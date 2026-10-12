@@ -103,15 +103,20 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
     final dist =
         double.tryParse(_distanceController.text.trim().replaceAll(',', '.')) ??
         0.0;
-    final h = int.tryParse(_hoursController.text.trim()) ?? 0;
-    final m = int.tryParse(_minutesController.text.trim()) ?? 0;
-    final s = int.tryParse(_secondsController.text.trim()) ?? 0;
-    final totalSeconds = (h * 3600) + (m * 60) + s;
+    final totalSeconds = _parseTotalDuration() ?? 0;
 
     return ManualRunEntrySheet.calculatePaceString(
       dist,
       Duration(seconds: totalSeconds),
     );
+  }
+
+  int? _parseTotalDuration() {
+    final h = int.tryParse(_hoursController.text.trim()) ?? 0;
+    final m = int.tryParse(_minutesController.text.trim()) ?? 0;
+    final s = int.tryParse(_secondsController.text.trim()) ?? 0;
+    final totalSeconds = (h * 3600) + (m * 60) + s;
+    return totalSeconds > 0 ? totalSeconds : null;
   }
 
   Future<void> _pickDate() async {
@@ -133,11 +138,7 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
       );
 
       setState(() {
-        if (updated.isAfter(now)) {
-          _selectedDateTime = now;
-        } else {
-          _selectedDateTime = updated;
-        }
+        _selectedDateTime = updated.isAfter(now) ? now : updated;
         _dateError = null;
       });
     }
@@ -183,83 +184,160 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
     }
 
     final isFormValid = _formKey.currentState?.validate() ?? false;
-
-    final dist =
-        double.tryParse(_distanceController.text.trim().replaceAll(',', '.')) ??
-        0.0;
-    final h = int.tryParse(_hoursController.text.trim()) ?? 0;
-    final m = int.tryParse(_minutesController.text.trim()) ?? 0;
-    final s = int.tryParse(_secondsController.text.trim()) ?? 0;
-    final totalSeconds = (h * 3600) + (m * 60) + s;
-
-    if (totalSeconds <= 0) {
+    final totalSeconds = _parseTotalDuration();
+    if (totalSeconds == null) {
       setState(() {
         _durationError = 'Duration must be greater than 0';
       });
       return;
-    } else {
-      setState(() {
-        _durationError = null;
-      });
     }
+    setState(() => _durationError = null);
 
-    if (!isFormValid || dist <= 0) {
-      return;
-    }
+    final dist =
+        double.tryParse(_distanceController.text.trim().replaceAll(',', '.')) ??
+        0.0;
+    if (!isFormValid || dist <= 0) return;
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    setState(() => _isSubmitting = true);
 
     try {
       final rawName = _nameController.text.trim();
       final name = rawName.isNotEmpty ? rawName : 'Run';
-      final duration = Duration(seconds: totalSeconds);
-
       await ref
           .read(activitiesProvider.notifier)
           .addManualActivity(
             date: _selectedDateTime,
             distanceKm: dist,
-            duration: duration,
+            duration: Duration(seconds: totalSeconds),
             perceivedExertion: _rpe,
             name: name,
             shoeId: _selectedShoeId,
           );
 
-      if (mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Manual run "$name" logged successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Manual run "$name" logged successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save manual run: $e'),
-            backgroundColor: AppColors.danger,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save manual run: $e'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
     } finally {
       if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
+        setState(() => _isSubmitting = false);
       }
     }
   }
 
+  Widget _buildGrabHandle(bool isDark) {
+    return Center(
+      child: Container(
+        width: 36,
+        height: 4,
+        margin: const EdgeInsets.only(top: 8, bottom: 16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceTertiaryDark : AppColors.gray300,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text('Log Manual Run', style: AppTypography.headingLg),
+        IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: 'Close',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNameField() {
+    return TextFormField(
+      key: const Key('manual_run_name_input'),
+      controller: _nameController,
+      decoration: const InputDecoration(
+        labelText: 'Workout Title (Optional)',
+        hintText: 'e.g. Treadmill Run, Morning Jog',
+        prefixIcon: Icon(Icons.directions_run_outlined),
+      ),
+    );
+  }
+
+  Widget _buildShoeDropdown() {
+    return DropdownButtonFormField<String?>(
+      key: const Key('manual_run_shoe_dropdown'),
+      initialValue: _selectedShoeId,
+      decoration: const InputDecoration(
+        labelText: 'Shoe (Optional)',
+        prefixIcon: Icon(Icons.roller_skating_outlined),
+      ),
+      items: const [
+        DropdownMenuItem(value: null, child: Text('None / Default')),
+        DropdownMenuItem(value: 'daily_trainer', child: Text('Daily Trainer')),
+        DropdownMenuItem(
+          value: 'tempo_shoe',
+          child: Text('Tempo / Speed Shoe'),
+        ),
+        DropdownMenuItem(
+          value: 'race_shoe',
+          child: Text('Race Day Plated Shoe'),
+        ),
+        DropdownMenuItem(
+          value: 'recovery_shoe',
+          child: Text('Recovery / Max Cushion'),
+        ),
+      ],
+      onChanged: (val) => setState(() => _selectedShoeId = val),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return SizedBox(
+      height: 48,
+      child: FilledButton(
+        key: const Key('manual_run_submit_button'),
+        onPressed: _isSubmitting ? null : _submit,
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.brandOrange,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Text(
+                'Log Run',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final dateFormat = DateFormat('EEE, MMM d, yyyy');
-    final timeFormat = DateFormat('h:mm a');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -275,346 +353,333 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Grab handle
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(top: 8, bottom: 16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.surfaceTertiaryDark
-                        : AppColors.gray300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-
-              // Sheet Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Log Manual Run', style: AppTypography.headingLg),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
+              _buildGrabHandle(isDark),
+              _buildHeader(context),
+              const SizedBox(height: 16),
+              _buildNameField(),
+              const SizedBox(height: 16),
+              _DateTimeSection(
+                selectedDateTime: _selectedDateTime,
+                dateError: _dateError,
+                onPickDate: _pickDate,
+                onPickTime: _pickTime,
               ),
               const SizedBox(height: 16),
-
-              // Activity Name (Optional)
-              TextFormField(
-                key: const Key('manual_run_name_input'),
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Workout Title (Optional)',
-                  hintText: 'e.g. Treadmill Run, Morning Jog',
-                  prefixIcon: Icon(Icons.directions_run_outlined),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Date & Time Picker Section
-              Text('Date & Start Time', style: AppTypography.headingSm),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('manual_run_date_picker_button'),
-                      icon: const Icon(Icons.calendar_today_outlined, size: 18),
-                      label: Text(
-                        dateFormat.format(_selectedDateTime),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: _pickDate,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('manual_run_time_picker_button'),
-                      icon: const Icon(Icons.access_time_outlined, size: 18),
-                      label: Text(
-                        timeFormat.format(_selectedDateTime),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onPressed: _pickTime,
-                    ),
-                  ),
-                ],
-              ),
-              if (_dateError != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _dateError!,
-                  style: TextStyle(color: AppColors.danger, fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 16),
-
-              // Distance Input
-              TextFormField(
-                key: const Key('manual_run_distance_input'),
+              _DistanceSection(
                 controller: _distanceController,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Distance (km)',
-                  hintText: '0.00',
-                  prefixIcon: Icon(Icons.route_outlined),
-                  suffixText: 'km',
-                ),
                 onChanged: (_) => setState(() {}),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a distance';
-                  }
-                  final dist = double.tryParse(
-                    value.trim().replaceAll(',', '.'),
-                  );
-                  if (dist == null || dist <= 0) {
-                    return 'Distance must be greater than 0 km';
-                  }
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
-
-              // Duration Input
-              Text('Duration', style: AppTypography.headingSm),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('manual_run_hours_input'),
-                      controller: _hoursController,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        labelText: 'Hours',
-                        hintText: '0',
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('manual_run_minutes_input'),
-                      controller: _minutesController,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        labelText: 'Minutes',
-                        hintText: '00',
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      validator: (value) {
-                        if (value != null && value.trim().isNotEmpty) {
-                          final m = int.tryParse(value.trim());
-                          if (m == null || m < 0 || m >= 60) {
-                            return '0-59';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      key: const Key('manual_run_seconds_input'),
-                      controller: _secondsController,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        labelText: 'Seconds',
-                        hintText: '00',
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      validator: (value) {
-                        if (value != null && value.trim().isNotEmpty) {
-                          final s = int.tryParse(value.trim());
-                          if (s == null || s < 0 || s >= 60) {
-                            return '0-59';
-                          }
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              if (_durationError != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  _durationError!,
-                  style: TextStyle(color: AppColors.danger, fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 16),
-
-              // Dynamic Real-time Pace Display
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.surfaceTertiaryDark
-                      : AppColors.brandOrangeTint,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  border: Border.all(
-                    color: AppColors.brandOrange.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.speed_rounded,
-                          color: AppColors.brandOrange,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text('Average Pace', style: AppTypography.headingSm),
-                      ],
-                    ),
-                    Text(
-                      _calculatePace(),
-                      key: const Key('manual_run_pace_display'),
-                      style: AppTypography.statValue.copyWith(
-                        color: AppColors.brandOrange,
-                      ),
-                    ),
-                  ],
-                ),
+              _DurationPaceSection(
+                hoursController: _hoursController,
+                minutesController: _minutesController,
+                secondsController: _secondsController,
+                durationError: _durationError,
+                paceString: _calculatePace(),
+                isDark: isDark,
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 20),
-
-              // Perceived Exertion (RPE 1-10) Selector
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Perceived Exertion (RPE)',
-                    style: AppTypography.headingSm,
-                  ),
-                  Text(
-                    '${_rpe.round()} / 10',
-                    key: const Key('manual_run_rpe_value'),
-                    style: AppTypography.headingSm.copyWith(
-                      color: AppColors.brandOrange,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                key: const Key('manual_run_rpe_slider'),
-                value: _rpe,
-                min: 1.0,
-                max: 10.0,
-                divisions: 9,
-                activeColor: AppColors.brandOrange,
-                inactiveColor: isDark
-                    ? AppColors.surfaceTertiaryDark
-                    : AppColors.gray200,
-                onChanged: (value) => setState(() => _rpe = value),
-              ),
-              Text(
-                ManualRunEntrySheet.getRpeLabel(_rpe.round()),
-                key: const Key('manual_run_rpe_label'),
-                textAlign: TextAlign.center,
-                style: AppTypography.bodySm.copyWith(
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.gray700,
-                  fontWeight: FontWeight.w500,
-                ),
+              _RpeSelectorSection(
+                rpe: _rpe,
+                isDark: isDark,
+                onRpeChanged: (value) => setState(() => _rpe = value),
               ),
               const SizedBox(height: 16),
-
-              // Optional Shoe Selector
-              DropdownButtonFormField<String?>(
-                key: const Key('manual_run_shoe_dropdown'),
-                initialValue: _selectedShoeId,
-                decoration: const InputDecoration(
-                  labelText: 'Shoe (Optional)',
-                  prefixIcon: Icon(Icons.roller_skating_outlined),
-                ),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('None / Default')),
-                  DropdownMenuItem(
-                    value: 'daily_trainer',
-                    child: Text('Daily Trainer'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'tempo_shoe',
-                    child: Text('Tempo / Speed Shoe'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'race_shoe',
-                    child: Text('Race Day Plated Shoe'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'recovery_shoe',
-                    child: Text('Recovery / Max Cushion'),
-                  ),
-                ],
-                onChanged: (val) {
-                  setState(() {
-                    _selectedShoeId = val;
-                  });
-                },
-              ),
+              _buildShoeDropdown(),
               const SizedBox(height: 24),
-
-              // Submit Button
-              SizedBox(
-                height: 48,
-                child: FilledButton(
-                  key: const Key('manual_run_submit_button'),
-                  onPressed: _isSubmitting ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.brandOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Log Run',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ),
+              _buildSubmitButton(),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DateTimeSection extends StatelessWidget {
+  final DateTime selectedDateTime;
+  final String? dateError;
+  final VoidCallback onPickDate;
+  final VoidCallback onPickTime;
+
+  const _DateTimeSection({
+    required this.selectedDateTime,
+    required this.dateError,
+    required this.onPickDate,
+    required this.onPickTime,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('EEE, MMM d, yyyy');
+    final timeFormat = DateFormat('h:mm a');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Date & Start Time', style: AppTypography.headingSm),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('manual_run_date_picker_button'),
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Text(
+                  dateFormat.format(selectedDateTime),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onPressed: onPickDate,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('manual_run_time_picker_button'),
+                icon: const Icon(Icons.access_time_outlined, size: 18),
+                label: Text(
+                  timeFormat.format(selectedDateTime),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onPressed: onPickTime,
+              ),
+            ),
+          ],
+        ),
+        if (dateError case final error?) ...[
+          const SizedBox(height: 4),
+          Text(
+            error,
+            style: const TextStyle(color: AppColors.danger, fontSize: 12),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DistanceSection extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _DistanceSection({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      key: const Key('manual_run_distance_input'),
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Distance (km)',
+        hintText: '0.00',
+        prefixIcon: Icon(Icons.route_outlined),
+        suffixText: 'km',
+      ),
+      onChanged: onChanged,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return 'Please enter a distance';
+        }
+        final dist = double.tryParse(value.trim().replaceAll(',', '.'));
+        if (dist == null || dist <= 0) {
+          return 'Distance must be greater than 0 km';
+        }
+        return null;
+      },
+    );
+  }
+}
+
+class _DurationPaceSection extends StatelessWidget {
+  final TextEditingController hoursController;
+  final TextEditingController minutesController;
+  final TextEditingController secondsController;
+  final String? durationError;
+  final String paceString;
+  final bool isDark;
+  final ValueChanged<String> onChanged;
+
+  const _DurationPaceSection({
+    required this.hoursController,
+    required this.minutesController,
+    required this.secondsController,
+    required this.durationError,
+    required this.paceString,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  static String? _validateSexagesimal(String? value) {
+    if (value != null && value.trim().isNotEmpty) {
+      final v = int.tryParse(value.trim());
+      if (v == null || v < 0 || v >= 60) {
+        return '0-59';
+      }
+    }
+    return null;
+  }
+
+  Widget _buildPaceDisplay() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.surfaceTertiaryDark
+            : AppColors.brandOrangeTint,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.speed_rounded,
+                color: AppColors.brandOrange,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text('Average Pace', style: AppTypography.headingSm),
+            ],
+          ),
+          Text(
+            paceString,
+            key: const Key('manual_run_pace_display'),
+            style: AppTypography.statValue.copyWith(
+              color: AppColors.brandOrange,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Duration', style: AppTypography.headingSm),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                key: const Key('manual_run_hours_input'),
+                controller: hoursController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  labelText: 'Hours',
+                  hintText: '0',
+                ),
+                onChanged: onChanged,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                key: const Key('manual_run_minutes_input'),
+                controller: minutesController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  labelText: 'Minutes',
+                  hintText: '00',
+                ),
+                onChanged: onChanged,
+                validator: _validateSexagesimal,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextFormField(
+                key: const Key('manual_run_seconds_input'),
+                controller: secondsController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  labelText: 'Seconds',
+                  hintText: '00',
+                ),
+                onChanged: onChanged,
+                validator: _validateSexagesimal,
+              ),
+            ),
+          ],
+        ),
+        if (durationError case final error?) ...[
+          const SizedBox(height: 4),
+          Text(
+            error,
+            style: const TextStyle(color: AppColors.danger, fontSize: 12),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _buildPaceDisplay(),
+      ],
+    );
+  }
+}
+
+class _RpeSelectorSection extends StatelessWidget {
+  final double rpe;
+  final bool isDark;
+  final ValueChanged<double> onRpeChanged;
+
+  const _RpeSelectorSection({
+    required this.rpe,
+    required this.isDark,
+    required this.onRpeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final roundedRpe = rpe.round();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Perceived Exertion (RPE)', style: AppTypography.headingSm),
+            Text(
+              '$roundedRpe / 10',
+              key: const Key('manual_run_rpe_value'),
+              style: AppTypography.headingSm.copyWith(
+                color: AppColors.brandOrange,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          key: const Key('manual_run_rpe_slider'),
+          value: rpe,
+          min: 1.0,
+          max: 10.0,
+          divisions: 9,
+          activeColor: AppColors.brandOrange,
+          inactiveColor: isDark
+              ? AppColors.surfaceTertiaryDark
+              : AppColors.gray200,
+          onChanged: onRpeChanged,
+        ),
+        Text(
+          ManualRunEntrySheet.getRpeLabel(roundedRpe),
+          key: const Key('manual_run_rpe_label'),
+          textAlign: TextAlign.center,
+          style: AppTypography.bodySm.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

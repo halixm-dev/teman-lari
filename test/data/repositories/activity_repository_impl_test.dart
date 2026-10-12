@@ -875,5 +875,74 @@ void main() {
         check(fakeRemote.getAllActivitiesCallCount).equals(0);
       },
     );
+
+    test(
+      'getAllActivities derives TrainingLoad from RPE when averageHeartrate is null',
+      () async {
+        fakeTokens.tokens = null;
+        fakeLocal.storedActivities = [
+          const ActivityModel(
+            id: 1,
+            name: 'Easy RPE Run',
+            type: 'Run',
+            distance: 3000.0,
+            movingTime: 1800,
+            elapsedTime: 1800,
+            totalElevationGain: 0.0,
+            startDate: '2026-04-01T08:00:00Z',
+            averageSpeed: 1.67,
+            maxSpeed: 2.0,
+            perceivedExertion: 4.0,
+          ),
+          const ActivityModel(
+            id: 2,
+            name: 'Moderate RPE Run',
+            type: 'Run',
+            distance: 6000.0,
+            movingTime: 3600,
+            elapsedTime: 3600,
+            totalElevationGain: 0.0,
+            startDate: '2026-04-02T08:00:00Z',
+            averageSpeed: 1.67,
+            maxSpeed: 2.0,
+            perceivedExertion: 7.0,
+          ),
+          const ActivityModel(
+            id: 3,
+            name: 'Hard RPE Run',
+            type: 'Run',
+            distance: 8000.0,
+            movingTime: 3600,
+            elapsedTime: 3600,
+            totalElevationGain: 0.0,
+            startDate: '2026-04-03T08:00:00Z',
+            averageSpeed: 2.22,
+            maxSpeed: 2.5,
+            perceivedExertion: 9.0,
+          ),
+          const ActivityModel(
+            id: 4,
+            name: 'Very Hard RPE Run',
+            type: 'Run',
+            distance: 12000.0,
+            movingTime: 5400,
+            elapsedTime: 5400,
+            totalElevationGain: 0.0,
+            startDate: '2026-04-04T08:00:00Z',
+            averageSpeed: 2.22,
+            maxSpeed: 2.5,
+            perceivedExertion: 9.0,
+          ),
+        ];
+
+        final result = await repository.getAllActivities();
+
+        check(result.length).equals(4);
+        check(result[0].trainingLoad).equals(TrainingLoad.easy);
+        check(result[1].trainingLoad).equals(TrainingLoad.moderate);
+        check(result[2].trainingLoad).equals(TrainingLoad.hard);
+        check(result[3].trainingLoad).equals(TrainingLoad.veryHard);
+      },
+    );
   });
 }

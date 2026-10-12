@@ -191,7 +191,7 @@ void main() {
         expect(fakeRepo.activities, hasLength(1));
         final saved = fakeRepo.activities.first;
         expect(saved.id, isNegative);
-        expect(saved.name, equals('Tempo Run Run'));
+        expect(saved.name, equals('Tempo Run'));
         expect(saved.type, equals(ActivityType.run));
         expect(saved.isLocal, isTrue);
         expect(saved.movingTime.inSeconds, equals(4));
@@ -306,6 +306,50 @@ void main() {
         // Sheet closed and no activity was saved
         expect(find.text('End Workout Early?'), findsNothing);
         expect(fakeRepo.activities, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'completing all intervals naturally triggers heavy haptic feedback and assigns non-redundant name',
+      (WidgetTester tester) async {
+        final List<String> hapticCalls = [];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (
+              MethodCall methodCall,
+            ) async {
+              if (methodCall.method == 'HapticFeedback.vibrate') {
+                hapticCalls.add(methodCall.arguments as String);
+              }
+              return null;
+            });
+
+        final fakeRepo = FakeActivityRepository();
+        final day = TrainingDay(
+          date: DateTime(2026, 10, 12),
+          type: WorkoutType.intervals,
+          description: 'Natural complete test',
+          intervals: const [
+            IntervalPhase(
+              type: IntervalPhaseType.work,
+              duration: Duration(seconds: 1),
+            ),
+          ],
+        );
+
+        await tester.pumpWidget(
+          buildTestableScreen(day: day, fakeRepo: fakeRepo),
+        );
+        await tester.pump();
+
+        await tester.tap(find.byIcon(Icons.play_arrow));
+        await tester.pump();
+
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+
+        expect(hapticCalls, contains('HapticFeedbackType.heavyImpact'));
+        expect(fakeRepo.activities, hasLength(1));
+        expect(fakeRepo.activities.first.name, equals('Interval Training Run'));
       },
     );
   });

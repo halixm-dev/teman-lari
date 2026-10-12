@@ -88,6 +88,7 @@ class TrainingLoadCalculator {
     Duration? thresholdPace,
   }) {
     final hr = activity.avgHeartRate;
+    final rpe = activity.perceivedExertion;
     final durationHours = activity.movingTime.inSeconds / 3600.0;
     double tss = 0.0;
 
@@ -97,8 +98,7 @@ class TrainingLoadCalculator {
       const thresholdHrReserve = 0.85;
       final intensityFactor = hrReserve / thresholdHrReserve;
       tss = intensityFactor * intensityFactor * durationHours * 100;
-    } else if (activity.perceivedExertion != null) {
-      final rpe = activity.perceivedExertion!;
+    } else if (rpe != null) {
       tss = durationHours * (rpe / 10.0) * (rpe / 10.0) * 100.0;
     } else if (thresholdPace != null && activity.pace.inSeconds > 0) {
       double ifPace = thresholdPace.inSeconds / activity.pace.inSeconds;

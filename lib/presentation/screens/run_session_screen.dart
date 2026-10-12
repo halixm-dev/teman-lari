@@ -311,6 +311,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
     if (newPhase != _lastPhase) {
       if (newPhase == WorkoutPhase.finished) {
+        HapticFeedback.heavyImpact();
         if (_state.isAudioCoachOn) {
           ref.read(voiceCoachProvider).announceWorkoutComplete();
         }
@@ -409,15 +410,20 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     if (_isSaved) return;
     _isSaved = true;
 
-    final paceSec =
-        _state.currentPaceSecondsPerKm ??
-        (_state.distanceKm > 0
-            ? (_state.elapsedSeconds / _state.distanceKm).round()
-            : 300);
+    final paceSec = _state.distanceKm > 0
+        ? (_state.elapsedSeconds / _state.distanceKm).round()
+        : (_state.currentPaceSecondsPerKm ?? 300);
+
+    final double? avgCadence = (_lastStepCount > 0 && _state.elapsedSeconds > 0)
+        ? (_lastStepCount / (_state.elapsedSeconds / 60.0))
+        : null;
+
+    final label = typeLabel(_state.plan.type);
+    final name = label.endsWith('Run') ? label : '$label Run';
 
     final activity = Activity(
       id: -DateTime.now().millisecondsSinceEpoch,
-      name: '${typeLabel(_state.plan.type)} Run',
+      name: name,
       date: DateTime.now(),
       type: ActivityType.run,
       distanceKm: _state.distanceKm,
@@ -425,6 +431,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
       pace: Duration(seconds: paceSec),
       elevationGainM: 0.0,
       trainingLoad: TrainingLoad.moderate,
+      avgCadence: avgCadence,
       isLocal: true,
     );
 
