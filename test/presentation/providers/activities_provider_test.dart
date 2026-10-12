@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teman_lari/domain/entities/activity.dart';
 import 'package:teman_lari/domain/repositories/activity_repository.dart';
 import 'package:teman_lari/presentation/providers/activities_provider.dart';
@@ -197,6 +198,134 @@ void main() {
         final state = container.read(activitiesProvider);
         expect(state.value, hasLength(1));
         expect(state.value!.first.id, equals(saved.id));
+      },
+    );
+  });
+
+  group('runningStatsProvider with manual activities and on-device reactivity', () {
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    test(
+      'computes stats for manual activities with RPE and triggers recomputation when manual runs are added',
+      () async {
+        final now = DateTime.now();
+        final initialManualRun = Activity(
+          id: -1001,
+          name: 'Manual Tempo Run',
+          date: DateTime(
+            now.year,
+            now.month,
+            now.day,
+          ).subtract(const Duration(days: 1)),
+          type: ActivityType.run,
+          distanceKm: 10.0,
+          movingTime: const Duration(seconds: 3600),
+          pace: const Duration(seconds: 360),
+          elevationGainM: 0.0,
+          trainingLoad: TrainingLoad.moderate,
+          perceivedExertion: 8.0,
+          isLocal: true,
+        );
+
+        final fakeRepo = FakeActivityRepository();
+        fakeRepo.activities = [initialManualRun];
+
+        final container = ProviderContainer(
+          overrides: [activityRepositoryProvider.overrideWithValue(fakeRepo)],
+        );
+        addTearDown(container.dispose);
+
+        // Keep active listeners to verify reactivity
+        container.listen(activitiesProvider, (_, _) {});
+        container.listen(runningStatsProvider, (_, _) {});
+
+        // Initial computation verifies manual activity with RPE computes valid stats on-device
+        final initialStats = await container.read(runningStatsProvider.future);
+        expect(initialStats, isNotNull);
+        expect(initialStats!.totalRuns, equals(1));
+        expect(initialStats.totalDistanceKm, equals(10.0));
+        expect(initialStats.fitnessScore, greaterThan(0));
+        expect(initialStats.fatigueScore, greaterThan(0));
+        expect(
+          initialStats.formScore,
+          closeTo(initialStats.fitnessScore - initialStats.fatigueScore, 0.001),
+        );
+        expect(initialStats.trainingLoadHistory, isNotEmpty);
+
+        // Add a second manual run via addManualActivity
+        await container
+            .read(activitiesProvider.notifier)
+            .addManualActivity(
+              date: DateTime(now.year, now.month, now.day),
+              distanceKm: 8.0,
+              duration: const Duration(minutes: 48),
+              perceivedExertion: 7.0,
+              name: 'Second Manual Run',
+            );
+
+        // Verify runningStats was reactively recomputed on-device with the new manual run
+        final updatedStats = await container.read(runningStatsProvider.future);
+        expect(updatedStats, isNotNull);
+        expect(updatedStats!.totalRuns, equals(2));
+        expect(updatedStats.totalDistanceKm, equals(18.0));
+        expect(
+          updatedStats.fitnessScore,
+          greaterThan(initialStats.fitnessScore),
+        );
+        expect(
+          updatedStats.fatigueScore,
+          greaterThan(initialStats.fatigueScore),
+        );
+        expect(
+          updatedStats.formScore,
+          closeTo(updatedStats.fitnessScore - updatedStats.fatigueScore, 0.001),
+        );
+      },
+    );
+
+    test(
+      'triggers recomputation when live workout is saved via saveCompletedRun',
+      () async {
+        final now = DateTime.now();
+        final fakeRepo = FakeActivityRepository();
+
+        final container = ProviderContainer(
+          overrides: [activityRepositoryProvider.overrideWithValue(fakeRepo)],
+        );
+        addTearDown(container.dispose);
+
+        container.listen(activitiesProvider, (_, _) {});
+        container.listen(runningStatsProvider, (_, _) {});
+
+        final initialStats = await container.read(runningStatsProvider.future);
+        expect(initialStats, isNotNull);
+        expect(initialStats!.totalRuns, equals(0));
+
+        final completedRun = Activity(
+          id: -1728734400000,
+          name: 'Completed Track Session',
+          date: DateTime(now.year, now.month, now.day),
+          type: ActivityType.run,
+          distanceKm: 5.0,
+          movingTime: const Duration(minutes: 25),
+          pace: const Duration(seconds: 300),
+          elevationGainM: 10.0,
+          trainingLoad: TrainingLoad.moderate,
+          perceivedExertion: 6.0,
+          isLocal: true,
+        );
+
+        await container
+            .read(activitiesProvider.notifier)
+            .saveCompletedRun(completedRun);
+
+        final updatedStats = await container.read(runningStatsProvider.future);
+        expect(updatedStats, isNotNull);
+        expect(updatedStats!.totalRuns, equals(1));
+        expect(updatedStats.totalDistanceKm, equals(5.0));
+        expect(updatedStats.fitnessScore, greaterThan(0));
       },
     );
   });
