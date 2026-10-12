@@ -55,3 +55,7 @@ key.properties
 .env.*
 config/prod.json
 
+# Agent scratch & teamwork session artifacts
+.agents/teamwork/
+
+
