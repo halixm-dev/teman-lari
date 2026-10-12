@@ -113,5 +113,45 @@ void main() {
         expect(prefs.age, isNotNull);
       },
     );
+
+    test(
+      'hasCompletedOnboarding returns false by default when unset',
+      () async {
+        expect(await storage.hasCompletedOnboarding(), isFalse);
+      },
+    );
+
+    test(
+      'hasCompletedOnboarding returns false when explicitly stored as false',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'has_completed_onboarding': false,
+        });
+        expect(await storage.hasCompletedOnboarding(), isFalse);
+      },
+    );
+
+    test(
+      'hasCompletedOnboarding returns true when explicitly stored as true',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'has_completed_onboarding': true,
+        });
+        expect(await storage.hasCompletedOnboarding(), isTrue);
+      },
+    );
+
+    test('setCompletedOnboarding defaults to true and persists flag', () async {
+      await storage.setCompletedOnboarding();
+      expect(await storage.hasCompletedOnboarding(), isTrue);
+    });
+
+    test('setCompletedOnboarding(false) updates flag to false', () async {
+      await storage.setCompletedOnboarding(true);
+      expect(await storage.hasCompletedOnboarding(), isTrue);
+
+      await storage.setCompletedOnboarding(false);
+      expect(await storage.hasCompletedOnboarding(), isFalse);
+    });
   });
 }

@@ -27,8 +27,19 @@ class PreferencesStorage {
   static const _keyAthleteName = 'athlete_name';
   static const _keyWeekInCycle = 'week_in_cycle';
   static const _keyCycleStartDate = 'cycle_start_date';
+  static const _keyHasCompletedOnboarding = 'has_completed_onboarding';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  Future<bool> hasCompletedOnboarding() async {
+    final prefs = await _prefs;
+    return prefs.getBool(_keyHasCompletedOnboarding) ?? false;
+  }
+
+  Future<void> setCompletedOnboarding([bool completed = true]) async {
+    final prefs = await _prefs;
+    await prefs.setBool(_keyHasCompletedOnboarding, completed);
+  }
 
   Future<int> getRestingHr() async =>
       (await _prefs).getInt(_keyRestingHr) ?? 60;

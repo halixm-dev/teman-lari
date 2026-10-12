@@ -161,7 +161,7 @@ void main() {
     await Hive.openBox('activities');
     await Hive.openBox('hr_streams');
 
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'has_completed_onboarding': true});
     preferencesStorage = PreferencesStorage();
     fakeTokenStorage = FakeTokenStorage();
     fakeAuthDataSource = FakeStravaAuthDataSource();
