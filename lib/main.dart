@@ -5,6 +5,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/utils/responsive.dart';
 import 'data/datasources/preferences_storage.dart';
+import 'data/backup/snapshot_backup_service.dart';
+import 'presentation/widgets/local_recovery_gate.dart';
+import 'presentation/widgets/tracked_workout_guard.dart';
 import 'domain/entities/training_plan.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/core_provider.dart';
@@ -42,8 +45,9 @@ GoRouter createRouter({
       GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),
       GoRoute(
         path: '/run-session',
-        builder: (context, state) =>
-            RunSessionScreen(day: state.extra as TrainingDay),
+        builder: (context, state) => TrackedWorkoutGuard(
+          child: RunSessionScreen(day: state.extra as TrainingDay),
+        ),
       ),
       GoRoute(
         path: '/settings',
@@ -70,7 +74,12 @@ GoRouter createRouter({
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  runApp(const ProviderScope(child: TemanLariApp()));
+  runApp(
+    LocalRecoveryGate(
+      initialize: SnapshotBackupService.shared.initialize,
+      ready: () => const ProviderScope(child: TemanLariApp()),
+    ),
+  );
 }
 
 class TemanLariApp extends ConsumerStatefulWidget {

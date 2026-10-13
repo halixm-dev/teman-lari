@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/usecases/demographics_calculator.dart';
+import '../backup/local_data_coordinator.dart';
+import '../backup/durable_preference_checkpoint.dart';
 
 class HrPreferences {
   final int? maxHr;
@@ -32,6 +34,15 @@ class HrPreferences {
 }
 
 class PreferencesStorage {
+  final LocalDataCoordinator coordinator;
+  final DateTime Function() clock;
+
+  PreferencesStorage({
+    LocalDataCoordinator? coordinator,
+    DateTime Function()? clock,
+  }) : coordinator = coordinator ?? LocalDataCoordinator.shared,
+       clock = clock ?? DateTime.now;
+
   static const _keyRestingHr = 'resting_hr';
   static const _keyMaxHr = 'max_hr';
   static const _keyThresholdPace = 'threshold_pace_sec';
@@ -64,13 +75,13 @@ class PreferencesStorage {
     await prefs.setBool(_keyHasCompletedOnboarding, completed);
   }
 
-  Future<int> getRestingHr() async =>
+  Future<int> _getRestingHr() async =>
       (await _prefs).getInt(_keyRestingHr) ?? 60;
-  Future<int?> getMaxHr() async => (await _prefs).getInt(_keyMaxHr);
-  Future<int?> getThresholdPace() async =>
+  Future<int?> _getMaxHr() async => (await _prefs).getInt(_keyMaxHr);
+  Future<int?> _getThresholdPace() async =>
       (await _prefs).getInt(_keyThresholdPace);
 
-  Future<HrPreferences> getPreferences() async {
+  Future<HrPreferences> _getPreferences() async {
     final prefs = await _prefs;
     return HrPreferences(
       restingHr: prefs.getInt(_keyRestingHr) ?? 60,
@@ -80,47 +91,55 @@ class PreferencesStorage {
     );
   }
 
-  Future<void> saveRestingHr(int value) async {
+  Future<void> _saveRestingHr(int value) async {
     final prefs = await _prefs;
-    await prefs.setInt(_keyRestingHr, value);
+    await _persist(prefs, _keyRestingHr, prefs.setInt(_keyRestingHr, value));
   }
 
-  Future<void> clearRestingHr() async {
+  Future<void> _clearRestingHr() async {
     final prefs = await _prefs;
-    await prefs.remove(_keyRestingHr);
+    await _persist(prefs, _keyRestingHr, prefs.remove(_keyRestingHr));
   }
 
-  Future<void> saveMaxHr(int value) async {
+  Future<void> _saveMaxHr(int value) async {
     final prefs = await _prefs;
-    await prefs.setInt(_keyMaxHr, value);
+    await _persist(prefs, _keyMaxHr, prefs.setInt(_keyMaxHr, value));
   }
 
-  Future<void> clearMaxHr() async {
+  Future<void> _clearMaxHr() async {
     final prefs = await _prefs;
-    await prefs.remove(_keyMaxHr);
+    await _persist(prefs, _keyMaxHr, prefs.remove(_keyMaxHr));
   }
 
-  Future<void> saveThresholdPace(int seconds) async {
+  Future<void> _saveThresholdPace(int seconds) async {
     final prefs = await _prefs;
-    await prefs.setInt(_keyThresholdPace, seconds);
+    await _persist(
+      prefs,
+      _keyThresholdPace,
+      prefs.setInt(_keyThresholdPace, seconds),
+    );
   }
 
-  Future<void> clearThresholdPace() async {
+  Future<void> _clearThresholdPace() async {
     final prefs = await _prefs;
-    await prefs.remove(_keyThresholdPace);
+    await _persist(prefs, _keyThresholdPace, prefs.remove(_keyThresholdPace));
   }
 
-  Future<void> saveDateOfBirth(String value) async {
+  Future<void> _saveDateOfBirth(String value) async {
     final prefs = await _prefs;
-    await prefs.setString(_keyDateOfBirth, value);
+    await _persist(
+      prefs,
+      _keyDateOfBirth,
+      prefs.setString(_keyDateOfBirth, value),
+    );
   }
 
-  Future<String?> getDateOfBirth() async {
+  Future<String?> _getDateOfBirth() async {
     final prefs = await _prefs;
     return prefs.getString(_keyDateOfBirth);
   }
 
-  Future<bool> updateFromStrava({
+  Future<bool> _updateFromStrava({
     int? activityMaxHr,
     double? athleteMaxHr,
     String? athleteDateOfBirth,
@@ -128,7 +147,6 @@ class PreferencesStorage {
   }) async {
     final prefs = await _prefs;
     bool changed = false;
-
     final storedMaxHr = prefs.getInt(_keyMaxHr);
     if (storedMaxHr == null) {
       final candidateMaxHr = _pickBestMaxHr(
@@ -137,52 +155,69 @@ class PreferencesStorage {
         athleteMaxHr: athleteMaxHr,
       );
       if (candidateMaxHr != null) {
-        await prefs.setInt(_keyMaxHr, candidateMaxHr);
+        await _persist(
+          prefs,
+          _keyMaxHr,
+          prefs.setInt(_keyMaxHr, candidateMaxHr),
+        );
         changed = true;
       }
     } else if (activityMaxHr != null && activityMaxHr > storedMaxHr) {
-      await prefs.setInt(_keyMaxHr, activityMaxHr);
+      await _persist(prefs, _keyMaxHr, prefs.setInt(_keyMaxHr, activityMaxHr));
       changed = true;
     }
-
     final storedDob = prefs.getString(_keyDateOfBirth);
     if (storedDob == null && athleteDateOfBirth != null) {
-      await prefs.setString(_keyDateOfBirth, athleteDateOfBirth);
+      await _persist(
+        prefs,
+        _keyDateOfBirth,
+        prefs.setString(_keyDateOfBirth, athleteDateOfBirth),
+      );
       changed = true;
     }
-
     final storedName = prefs.getString(_keyAthleteName);
     if ((storedName == null || storedName.isEmpty) &&
         athleteName != null &&
         athleteName.isNotEmpty) {
-      await prefs.setString(_keyAthleteName, athleteName);
+      await _persist(
+        prefs,
+        _keyAthleteName,
+        prefs.setString(_keyAthleteName, athleteName),
+      );
       changed = true;
     }
-
     return changed;
   }
 
-  Future<String?> getAthleteName() async {
+  Future<String?> _getAthleteName() async {
     final prefs = await _prefs;
     return prefs.getString(_keyAthleteName);
   }
 
-  Future<void> saveAthleteName(String name) async {
+  Future<void> _saveAthleteName(String name) async {
     final prefs = await _prefs;
-    await prefs.setString(_keyAthleteName, name);
+    await _persist(
+      prefs,
+      _keyAthleteName,
+      prefs.setString(_keyAthleteName, name),
+    );
   }
 
-  Future<int> getWeekInCycle() async {
+  Future<int> _getWeekInCycle() async {
     final prefs = await _prefs;
     return prefs.getInt(_keyWeekInCycle) ?? 0;
   }
 
-  Future<void> setWeekInCycle(int value) async {
+  Future<void> _setWeekInCycle(int value) async {
     final prefs = await _prefs;
-    await prefs.setInt(_keyWeekInCycle, value);
+    await _persist(
+      prefs,
+      _keyWeekInCycle,
+      prefs.setInt(_keyWeekInCycle, value),
+    );
   }
 
-  Future<DateTime> getCycleStartDate() async {
+  Future<DateTime> _getCycleStartDate() async {
     final prefs = await _prefs;
     final stored = prefs.getString(_keyCycleStartDate);
     if (stored != null) {
@@ -191,9 +226,89 @@ class PreferencesStorage {
     return DateTime.now();
   }
 
-  Future<void> setCycleStartDate(DateTime value) async {
+  Future<void> _setCycleStartDate(DateTime value) async {
     final prefs = await _prefs;
-    await prefs.setString(_keyCycleStartDate, value.toIso8601String());
+    await _persist(
+      prefs,
+      _keyCycleStartDate,
+      prefs.setString(_keyCycleStartDate, value.toIso8601String()),
+    );
+  }
+
+  Future<int> getRestingHr() => coordinator.read(() => _getRestingHr());
+
+  Future<int?> getMaxHr() => coordinator.read(() => _getMaxHr());
+
+  Future<int?> getThresholdPace() =>
+      coordinator.read(() => _getThresholdPace());
+
+  Future<HrPreferences> getPreferences() =>
+      coordinator.read(() => _getPreferences());
+
+  Future<void> saveRestingHr(int value) =>
+      coordinator.write(() => _saveRestingHr(value));
+
+  Future<void> clearRestingHr() => coordinator.write(() => _clearRestingHr());
+
+  Future<void> saveMaxHr(int value) =>
+      coordinator.write(() => _saveMaxHr(value));
+
+  Future<void> clearMaxHr() => coordinator.write(() => _clearMaxHr());
+
+  Future<void> saveThresholdPace(int seconds) =>
+      coordinator.write(() => _saveThresholdPace(seconds));
+
+  Future<void> clearThresholdPace() =>
+      coordinator.write(() => _clearThresholdPace());
+
+  Future<void> saveDateOfBirth(String value) =>
+      coordinator.write(() => _saveDateOfBirth(value));
+
+  Future<String?> getDateOfBirth() => coordinator.read(() => _getDateOfBirth());
+
+  Future<bool> updateFromStrava({
+    int? activityMaxHr,
+    double? athleteMaxHr,
+    String? athleteDateOfBirth,
+    String? athleteName,
+  }) => coordinator.write(
+    () => _updateFromStrava(
+      activityMaxHr: activityMaxHr,
+      athleteMaxHr: athleteMaxHr,
+      athleteDateOfBirth: athleteDateOfBirth,
+      athleteName: athleteName,
+    ),
+  );
+
+  Future<String?> getAthleteName() => coordinator.read(() => _getAthleteName());
+
+  Future<void> saveAthleteName(String name) =>
+      coordinator.write(() => _saveAthleteName(name));
+
+  Future<int> getWeekInCycle() => coordinator.read(() => _getWeekInCycle());
+
+  Future<void> setWeekInCycle(int value) =>
+      coordinator.write(() => _setWeekInCycle(value));
+
+  Future<DateTime> getCycleStartDate() =>
+      coordinator.read(() => _getCycleStartDate());
+
+  Future<void> setCycleStartDate(DateTime value) =>
+      coordinator.write(() => _setCycleStartDate(value));
+
+  Future<void> _persist(
+    SharedPreferences prefs,
+    String key,
+    Future<bool> operation,
+  ) async {
+    if (!await operation) throw StateError('Could not save $key');
+    final timestamp = clock().toUtc().toIso8601String();
+    if (!await prefs.setString('${key}_modified_at', timestamp)) {
+      throw StateError('Could not save modification time for $key');
+    }
+    if (DurablePreferenceCheckpoint.isInitialized) {
+      await DurablePreferenceCheckpoint.record(prefs, key, timestamp);
+    }
   }
 
   int? _pickBestMaxHr({int? stored, int? activityMaxHr, double? athleteMaxHr}) {

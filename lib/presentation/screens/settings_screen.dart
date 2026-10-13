@@ -201,8 +201,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final nameText = _athleteNameController.text.trim();
 
     try {
-      await _persistAthleteName(nameText);
-      await _persistHrPreferences(restingText, maxText, paceText);
+      await ref.read(preferencesStorageProvider).coordinator.write(() async {
+        await _persistAthleteName(nameText);
+        await _persistHrPreferences(restingText, maxText, paceText);
+      });
 
       final prefs = await ref.read(hrPreferencesProvider.future);
       _storedRestingHr = prefs.restingHr;

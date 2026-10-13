@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/activity_model.dart';
+import '../backup/local_data_coordinator.dart';
 
 /// Transparent proxy around Hive [Box] ensuring that negative integer IDs
 /// and 64-bit integer IDs do not trigger Hive's [Frame.assertKey] error,
@@ -162,6 +163,10 @@ class _SafeBox implements Box {
 }
 
 class LocalActivityDataSource {
+  final LocalDataCoordinator coordinator;
+  LocalActivityDataSource({LocalDataCoordinator? coordinator})
+    : coordinator = coordinator ?? LocalDataCoordinator.shared;
+
   static const _activitiesBoxName = 'activities';
   static const _hrStreamsBoxName = 'hr_streams';
 
@@ -190,6 +195,42 @@ class LocalActivityDataSource {
     return safeBox;
   }
 
+  Future<void> saveActivities(List<ActivityModel> activities) =>
+      activities.isEmpty
+      ? Future.value()
+      : _write(() => _saveActivities(activities));
+  Future<void> saveActivity(ActivityModel activity) =>
+      _write(() => _saveActivity(activity));
+  Future<void> updateActivity(ActivityModel activity) =>
+      _write(() => _updateActivity(activity));
+  Future<void> updateLocalActivityId(
+    int oldLocalId,
+    ActivityModel updatedModel,
+  ) => _write(() => _updateLocalActivityId(oldLocalId, updatedModel));
+  Future<void> smartMergeActivities(List<ActivityModel> remoteActivities) =>
+      remoteActivities.isEmpty
+      ? Future.value()
+      : _write(() => _smartMergeActivities(remoteActivities));
+  Future<List<ActivityModel>?> getCachedActivities({bool checkTtl = true}) =>
+      coordinator.read(() => _getCachedActivities(checkTtl: checkTtl));
+  Future<List<ActivityModel>> getAllActivities() =>
+      coordinator.read(_getAllActivities);
+  Future<void> saveHeartRateStream(int activityId, List<double> data) =>
+      _write(() => _saveHeartRateStream(activityId, data));
+  Future<Map<int, List<double>>> getCachedHeartRateStreams({
+    bool checkTtl = true,
+  }) => coordinator.read(() => _getCachedHeartRateStreams(checkTtl: checkTtl));
+  Future<void> clearCache() => _write(_clearCache);
+
+  Future<void> _write(Future<void> Function() operation) =>
+      coordinator.write(() async {
+        await operation();
+        final activities = _activitiesBox;
+        final streams = _hrStreamsBox;
+        if (activities != null && activities.isOpen) await activities.flush();
+        if (streams != null && streams.isOpen) await streams.flush();
+      });
+
   /// Converts an activity ID to a valid Hive box key.
   /// 32-bit non-negative integers (0 to 0xFFFFFFFF) can be stored directly as int keys,
   /// while negative IDs and 64-bit IDs must be stored as String keys to satisfy Hive constraints.
@@ -209,7 +250,7 @@ class LocalActivityDataSource {
   }
 
   /// Saves a batch of activities additively into Hive.
-  Future<void> saveActivities(List<ActivityModel> activities) async {
+  Future<void> _saveActivities(List<ActivityModel> activities) async {
     if (activities.isEmpty) return;
     try {
       final box = await activitiesBox;
@@ -225,11 +266,13 @@ class LocalActivityDataSource {
       if (entries.isNotEmpty) {
         await box.putAll(entries);
       }
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Saves a single activity into Hive.
-  Future<void> saveActivity(ActivityModel activity) async {
+  Future<void> _saveActivity(ActivityModel activity) async {
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
@@ -238,11 +281,13 @@ class LocalActivityDataSource {
         'data': jsonEncode(activity.toJson()),
         'synced_at': DateTime.now().millisecondsSinceEpoch,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Updates an existing activity, preserving original synced_at timestamp if present.
-  Future<void> updateActivity(ActivityModel activity) async {
+  Future<void> _updateActivity(ActivityModel activity) async {
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
@@ -256,39 +301,43 @@ class LocalActivityDataSource {
         'data': jsonEncode(activity.toJson()),
         'synced_at': syncedAt,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Atomically re-keys a local workout (negative ID) to its new remote Strava ID upon upload.
-  Future<void> updateLocalActivityId(
+  Future<void> _updateLocalActivityId(
     int oldLocalId,
     ActivityModel updatedModel,
   ) async {
     try {
       final actBox = await activitiesBox;
-      await _deleteByKey(actBox, oldLocalId);
       await saveActivity(updatedModel);
+      await _deleteByKey(actBox, oldLocalId);
 
       // Re-key associated heart rate stream if one exists
       final hrBox = await hrStreamsBox;
       final oldHrKey = _toKey(oldLocalId);
       final hrEntry = hrBox.get(oldHrKey);
       if (hrEntry != null) {
-        await _deleteByKey(hrBox, oldLocalId);
         final newHrKey = _toKey(updatedModel.id);
         if (hrEntry is Map) {
           final data = Map<String, dynamic>.from(hrEntry);
           data['activity_id'] = updatedModel.id;
           await hrBox.put(newHrKey, data);
+          await _deleteByKey(hrBox, oldLocalId);
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Additively merges remote Strava activities into the local store,
   /// strictly preserving all local-only activities (id < 0) and
   /// retaining any local-only metadata/annotations on matching activities.
-  Future<void> smartMergeActivities(
+  Future<void> _smartMergeActivities(
     List<ActivityModel> remoteActivities,
   ) async {
     if (remoteActivities.isEmpty) return;
@@ -324,13 +373,15 @@ class LocalActivityDataSource {
       if (entries.isNotEmpty) {
         await box.putAll(entries);
       }
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Returns cached activities. Preserved for backwards compatibility with legacy callers
   /// and existing unit tests.
   /// When [checkTtl] is true, returns null if oldest activity is older than 1 hour.
-  Future<List<ActivityModel>?> getCachedActivities({
+  Future<List<ActivityModel>?> _getCachedActivities({
     bool checkTtl = true,
   }) async {
     try {
@@ -355,14 +406,14 @@ class LocalActivityDataSource {
           .map((r) => ActivityModel.fromJson(jsonDecode(r['data'] as String)))
           .toList();
     } catch (_) {
-      return null;
+      rethrow;
     }
   }
 
   /// Permanent Single Source of Truth (SSOT) retrieval with Zero-TTL.
   /// Returns all stored activities sorted chronologically descending (newest first).
   /// Never returns null; returns an empty list if no activities exist.
-  Future<List<ActivityModel>> getAllActivities() async {
+  Future<List<ActivityModel>> _getAllActivities() async {
     try {
       final box = await activitiesBox;
       if (box.isEmpty) return [];
@@ -387,7 +438,7 @@ class LocalActivityDataSource {
   }
 
   /// Saves a heart rate stream for an activity.
-  Future<void> saveHeartRateStream(int activityId, List<double> data) async {
+  Future<void> _saveHeartRateStream(int activityId, List<double> data) async {
     try {
       final box = await hrStreamsBox;
       final key = _toKey(activityId);
@@ -396,12 +447,14 @@ class LocalActivityDataSource {
         'data': jsonEncode(data),
         'synced_at': DateTime.now().millisecondsSinceEpoch,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Retrieves cached heart rate streams.
   /// When [checkTtl] is true, filters out streams older than 1 hour.
-  Future<Map<int, List<double>>> getCachedHeartRateStreams({
+  Future<Map<int, List<double>>> _getCachedHeartRateStreams({
     bool checkTtl = true,
   }) async {
     try {
@@ -423,7 +476,7 @@ class LocalActivityDataSource {
       }
       return result;
     } catch (_) {
-      return {};
+      rethrow;
     }
   }
 
@@ -432,12 +485,14 @@ class LocalActivityDataSource {
       getCachedHeartRateStreams(checkTtl: false);
 
   /// Clears all stored activities and heart rate streams.
-  Future<void> clearCache() async {
+  Future<void> _clearCache() async {
     try {
       final boxAct = await activitiesBox;
       final boxHr = await hrStreamsBox;
       await boxAct.clear();
       await boxHr.clear();
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 }
