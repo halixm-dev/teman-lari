@@ -1,13 +1,20 @@
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:math';
+
+import 'archive/snapshot_archive_codec.dart';
+import 'transport/backup_file_transport.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'local_data_coordinator.dart';
 import 'snapshot_store.dart';
 import 'snapshot_store_adapters.dart';
 
 export 'snapshot_store.dart';
+
+enum BackupExportPhase { idle, preparing, saving }
 
 enum SnapshotPhase { staged, storeWritten, committed, rolledBack }
 
@@ -34,8 +41,13 @@ class SnapshotBackupService {
     'week_in_cycle',
     'cycle_start_date',
   };
-  static final shared = SnapshotBackupService();
+  static final shared = SnapshotBackupService(versionReader: _packagedVersion);
   final LocalDataCoordinator coordinator;
+  final DateTime Function() clock;
+  final String Function() snapshotId;
+  final String appVersion;
+  final Future<String> Function()? versionReader;
+  final exportPhase = ValueNotifier<BackupExportPhase>(BackupExportPhase.idle);
   final SnapshotPhaseObserver? onPhase;
   final Future<bool> Function(int bytes)? checkAvailableSpace;
   final Map<String, SnapshotStore> _stores = {};
@@ -45,7 +57,13 @@ class SnapshotBackupService {
     Iterable<SnapshotStore>? stores,
     this.onPhase,
     this.checkAvailableSpace,
-  }) : coordinator = coordinator ?? LocalDataCoordinator.shared {
+    DateTime Function()? clock,
+    String Function()? snapshotId,
+    this.appVersion = '1.0.0+1',
+    this.versionReader,
+  }) : coordinator = coordinator ?? LocalDataCoordinator.shared,
+       clock = clock ?? DateTime.now,
+       snapshotId = snapshotId ?? _newSnapshotId {
     for (final store in stores ?? defaultStores()) {
       registerStore(store);
     }
@@ -97,6 +115,44 @@ class SnapshotBackupService {
       _validateStores(state);
       await _rollback(state);
     }
+  }
+
+  Future<PreparedBackup> prepareExport() =>
+      coordinator.snapshot(_prepareExport);
+
+  Future<PreparedBackup> _prepareExport() async => compute(_encodeExport, (
+    await _read(),
+    clock().toUtc(),
+    snapshotId(),
+    await _version(),
+  ));
+
+  Future<String> _version() async {
+    final reader = versionReader;
+    return reader == null ? appVersion : await reader();
+  }
+
+  /// Busy coordination covers both capture and the user's save destination.
+  Future<BackupDelivery> exportBackup(BackupFileTransport transport) =>
+      coordinator.snapshot(() async {
+        exportPhase.value = BackupExportPhase.preparing;
+        try {
+          final file = await _prepareExport();
+          exportPhase.value = BackupExportPhase.saving;
+          return await transport.save(
+            bytes: file.bytes,
+            filename: file.filename,
+          );
+        } finally {
+          exportPhase.value = BackupExportPhase.idle;
+        }
+      });
+
+  static String _newSnapshotId() {
+    final random = Random.secure();
+    return base64Url
+        .encode(List.generate(12, (_) => random.nextInt(256)))
+        .replaceAll('=', '');
   }
 
   Future<LocalSnapshot> readLocalState() => coordinator.snapshot(_read);
@@ -210,4 +266,25 @@ class SnapshotBackupService {
     await journal.clear();
     await journal.flush();
   }
+}
+
+PreparedBackup _encodeExport(
+  (LocalSnapshot, DateTime, String, String) values,
+) => const SnapshotArchiveCodec().encode(
+  values.$1,
+  values.$2,
+  values.$3,
+  values.$4,
+);
+
+Future<String> _packagedVersion() async {
+  if (kIsWeb) {
+    // build.sh injects pubspec's version; never fetch web version.json offline.
+    return const String.fromEnvironment(
+      'APP_VERSION',
+      defaultValue: 'development',
+    );
+  }
+  final package = await PackageInfo.fromPlatform();
+  return '${package.version}+${package.buildNumber}';
 }

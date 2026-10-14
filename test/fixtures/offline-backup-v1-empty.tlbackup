@@ -1,0 +1,60 @@
+{
+  "product": "teman_lari",
+  "schema_version": 1,
+  "snapshot_id": "fixture",
+  "created_at": "2026-10-14T00:00:00.000Z",
+  "app_version": "1.0.0+1",
+  "counts": {
+    "profile": 5,
+    "activities": 0,
+    "heart_rate_streams": 0,
+    "training_plan_state": 0,
+    "equipment": 0,
+    "rehab_feedback": 0
+  },
+  "data": {
+    "profile": {
+      "athlete_name": {
+        "value": "Guest",
+        "modified_at": null
+      },
+      "date_of_birth": {
+        "value": null,
+        "modified_at": null
+      },
+      "resting_hr": {
+        "value": null,
+        "modified_at": null
+      },
+      "max_hr": {
+        "value": null,
+        "modified_at": null
+      },
+      "threshold_pace_sec": {
+        "value": null,
+        "modified_at": null
+      }
+    },
+    "activities": [],
+    "heart_rate_streams": [],
+    "training_plan_state": {
+      "plans": [],
+      "week_in_cycle": {
+        "value": null,
+        "modified_at": null
+      },
+      "cycle_start_date": {
+        "value": null,
+        "modified_at": null
+      },
+      "modified_at": null
+    },
+    "equipment": {
+      "shoes": [],
+      "activity_assignments": []
+    },
+    "rehab_feedback": {
+      "records": []
+    }
+  }
+}

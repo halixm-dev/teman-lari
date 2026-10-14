@@ -7,6 +7,7 @@ import '../providers/core_provider.dart';
 import '../providers/preferences_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/settings/about_card.dart';
+import '../widgets/settings/backup_card.dart';
 import '../widgets/settings/heart_rate_card.dart';
 import '../widgets/settings/save_button.dart';
 import '../widgets/settings/strava_integration_card.dart';
@@ -338,6 +339,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'About',
               icon: Icons.info_outline_rounded,
             ),
+            const BackupCard(),
             const AboutCard(),
           ],
         ),

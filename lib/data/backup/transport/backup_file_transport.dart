@@ -4,12 +4,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../archive/snapshot_archive_codec.dart';
+
 import 'backup_native_save_stub.dart'
     if (dart.library.io) 'backup_native_save_io.dart'
     as native;
 
 /// Maximum input retained by the platform picker, before archive validation.
-const backupFileMaxBytes = 50 * 1024 * 1024;
+const backupFileMaxBytes = SnapshotArchiveLimits.maxBytes;
 
 enum BackupDelivery { saved, cancelled, downloadStarted, shared }
 
