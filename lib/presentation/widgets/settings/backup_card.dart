@@ -23,6 +23,7 @@ class _BackupCardState extends ConsumerState<BackupCard> {
     });
     try {
       final service = ref.read(snapshotBackupServiceProvider);
+      ref.invalidate(backupCountsProvider);
       final result = await service.exportBackup(
         ref.read(backupFileTransportProvider),
       );
@@ -64,6 +65,8 @@ class _BackupCardState extends ConsumerState<BackupCard> {
             const Text(
               'No account or internet needed. The backup contains readable personal data. Store it somewhere private.',
             ),
+            const SizedBox(height: 12),
+            const _BackupCounts(),
             const SizedBox(height: 16),
             ValueListenableBuilder<BackupExportPhase>(
               valueListenable: service.exportPhase,
@@ -104,5 +107,29 @@ class _BackupCardState extends ConsumerState<BackupCard> {
         ],
       ],
     );
+  }
+}
+
+class _BackupCounts extends ConsumerWidget {
+  const _BackupCounts();
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(snapshotBackupServiceProvider).coordinator.initialized) {
+      return const SizedBox.shrink();
+    }
+    return ref
+        .watch(backupCountsProvider)
+        .when(
+          data: (counts) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Saved training plans: ${counts['training_plans'] ?? 0}'),
+              Text('Shoe records and assignments: ${counts['equipment'] ?? 0}'),
+              Text('Rehab feedback records: ${counts['rehab_feedback'] ?? 0}'),
+            ],
+          ),
+          error: (_, _) => const Text('Saved-record counts unavailable.'),
+          loading: () => const SizedBox.shrink(),
+        );
   }
 }

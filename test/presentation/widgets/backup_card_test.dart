@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:teman_lari/domain/entities/training_plan.dart';
+import 'package:teman_lari/domain/usecases/training_plan_config.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -35,7 +37,9 @@ void main() {
     WidgetTester tester, {
     bool dark = false,
     double scale = 1,
+    bool showBackup = true,
   }) async {
+    await tester.runAsync(service.readBackupCounts);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -46,8 +50,12 @@ void main() {
           theme: dark ? ThemeData.dark() : ThemeData.light(),
           home: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-            child: const Scaffold(
-              body: SingleChildScrollView(child: BackupCard()),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: showBackup
+                    ? const BackupCard()
+                    : const SizedBox.shrink(),
+              ),
             ),
           ),
         ),
@@ -81,6 +89,41 @@ void main() {
       check(tester.takeException()).isNull();
     },
   );
+  testWidgets('Settings shows saved Training Plan count after reopening', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await service.resolveTrainingPlan(
+        inputs: 'saved',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async => TrainingPlan.empty(),
+      );
+      service = SnapshotBackupService(coordinator: LocalDataCoordinator());
+      await service.initialize();
+    });
+    await showCard(tester);
+    await tester.pumpAndSettle();
+    check(find.text('Saved training plans: 1').evaluate().length).equals(1);
+  });
+  testWidgets('returning to Settings refreshes saved plan counts', (
+    tester,
+  ) async {
+    await showCard(tester);
+    await tester.pumpAndSettle();
+    check(find.text('Saved training plans: 0').evaluate().length).equals(1);
+    await showCard(tester, showBackup: false);
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+      () => service.resolveTrainingPlan(
+        inputs: 'changed on Plan tab',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async => TrainingPlan.empty(),
+      ),
+    );
+    await showCard(tester);
+    await tester.pumpAndSettle();
+    check(find.text('Saved training plans: 1').evaluate().length).equals(1);
+  });
   for (final entry in {
     BackupDelivery.saved: 'Backup saved.',
     BackupDelivery.cancelled: 'Export cancelled. No backup was saved.',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'fixtures/recovery_plan.dart';
 
 import 'package:checks/checks.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,10 +33,7 @@ void main() {
     await service.applyLocalState(
       LocalSnapshot(
         revision: before.revision,
-        stores: {
-          ...before.stores,
-          'training_plans': {'plan': 'Before'},
-        },
+        stores: {...before.stores, 'training_plans': recoveryPlan('Before')},
       ),
       expectedRevision: before.revision,
     );
@@ -51,7 +49,7 @@ void main() {
     revision: before.revision,
     stores: {
       ...before.stores,
-      'training_plans': {'plan': 'After'},
+      'training_plans': recoveryPlan('After'),
       'equipment': {
         'shoe': {'id': 'shoe', 'name': 'After', 'category': 'daily_trainer'},
       },

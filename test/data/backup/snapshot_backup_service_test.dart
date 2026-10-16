@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'fixtures/recovery_plan.dart';
 import 'dart:async';
 
 import 'package:checks/checks.dart';
@@ -101,10 +102,7 @@ void main() {
       await service.applyLocalState(
         LocalSnapshot(
           revision: before.revision,
-          stores: {
-            ...before.stores,
-            'training_plans': {'plan': 'Before'},
-          },
+          stores: {...before.stores, 'training_plans': recoveryPlan('Before')},
         ),
         expectedRevision: before.revision,
       );
@@ -113,7 +111,9 @@ void main() {
       service = SnapshotBackupService(coordinator: LocalDataCoordinator());
       await service.initialize();
       check(
-        (await service.readLocalState()).stores['training_plans']?['plan'],
+        recoveryPlanGoal(
+          (await service.readLocalState()).stores['training_plans'],
+        ),
       ).equals('Before');
     },
     timeout: const Timeout(Duration(minutes: 2)),
@@ -181,10 +181,7 @@ void main() {
       await service.applyLocalState(
         LocalSnapshot(
           revision: before.revision,
-          stores: {
-            ...before.stores,
-            'training_plans': {'plan': 'Before'},
-          },
+          stores: {...before.stores, 'training_plans': recoveryPlan('Before')},
         ),
         expectedRevision: before.revision,
       );
@@ -193,14 +190,18 @@ void main() {
       service = SnapshotBackupService(coordinator: LocalDataCoordinator());
       await service.initialize();
       check(
-        (await service.readLocalState()).stores['training_plans']?['plan'],
+        recoveryPlanGoal(
+          (await service.readLocalState()).stores['training_plans'],
+        ),
       ).equals('After');
       // A second startup proves committed journal cleanup is idempotent.
       await Hive.close();
       service = SnapshotBackupService(coordinator: LocalDataCoordinator());
       await service.initialize();
       check(
-        (await service.readLocalState()).stores['training_plans']?['plan'],
+        recoveryPlanGoal(
+          (await service.readLocalState()).stores['training_plans'],
+        ),
       ).equals('After');
     },
     timeout: const Timeout(Duration(minutes: 2)),

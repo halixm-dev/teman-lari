@@ -10,3 +10,7 @@ final snapshotBackupServiceProvider = Provider<SnapshotBackupService>(
 final backupFileTransportProvider = Provider<BackupFileTransport>(
   (ref) => PlatformBackupFileTransport(),
 );
+
+final backupCountsProvider = FutureProvider.autoDispose<Map<String, int>>(
+  (ref) => ref.watch(snapshotBackupServiceProvider).readBackupCounts(),
+);

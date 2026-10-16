@@ -221,7 +221,7 @@ class PreferencesStorage {
     final prefs = await _prefs;
     final stored = prefs.getString(_keyCycleStartDate);
     if (stored != null) {
-      return DateTime.parse(stored);
+      return DateTime.parse(stored).toLocal();
     }
     return DateTime.now();
   }
@@ -231,7 +231,7 @@ class PreferencesStorage {
     await _persist(
       prefs,
       _keyCycleStartDate,
-      prefs.setString(_keyCycleStartDate, value.toIso8601String()),
+      prefs.setString(_keyCycleStartDate, value.toUtc().toIso8601String()),
     );
   }
 

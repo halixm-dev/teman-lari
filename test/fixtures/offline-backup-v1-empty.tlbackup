@@ -47,7 +47,9 @@
         "value": null,
         "modified_at": null
       },
-      "modified_at": null
+      "modified_at": null,
+      "active_plan_id": null,
+      "configuration": null
     },
     "equipment": {
       "shoes": [],

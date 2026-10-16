@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'archive/snapshot_archive_codec.dart';
+import 'archive/training_plan_section.dart';
 import 'archive/equipment_section.dart';
-
 import 'archive/rehab_feedback_section.dart';
 import 'transport/backup_file_transport.dart';
 import 'package:flutter/foundation.dart';
@@ -17,6 +17,7 @@ import 'snapshot_store.dart';
 import 'snapshot_store_adapters.dart';
 
 export 'snapshot_store.dart';
+export 'training_plan_persistence.dart' show TrainingPlanBackupOperations;
 
 enum BackupExportPhase { idle, preparing, saving }
 
@@ -24,6 +25,11 @@ enum SnapshotPhase { staged, storeWritten, committed, rolledBack }
 
 typedef SnapshotPhaseObserver =
     Future<void> Function(SnapshotPhase phase, String? store);
+
+class SnapshotRevisionConflict extends StateError {
+  SnapshotRevisionConflict()
+    : super('Local data changed. Refresh the import preview.');
+}
 
 class SnapshotRecoveryException implements Exception {
   final Object cause;
@@ -159,6 +165,19 @@ class SnapshotBackupService {
         .replaceAll('=', '');
   }
 
+  Future<Map<String, int>> readBackupCounts() => coordinator.read(() async {
+    final snapshot = await _read();
+    return {
+      'training_plans': const TrainingPlanSectionCodec()
+          .encode(snapshot)
+          .recordCount,
+      'equipment': const EquipmentSectionCodec().encode(snapshot).recordCount,
+      'rehab_feedback': const RehabFeedbackSectionCodec()
+          .encode(snapshot)
+          .recordCount,
+    };
+  });
+
   Future<LocalSnapshot> readLocalState() => coordinator.snapshot(_read);
 
   Future<LocalSnapshot> _read() async {
@@ -181,7 +200,7 @@ class SnapshotBackupService {
   }) => coordinator.write(() async {
     final current = await _read();
     if (expectedRevision != null && expectedRevision != current.revision) {
-      throw StateError('Local data changed before the edit.');
+      throw SnapshotRevisionConflict();
     }
     await _applyState(
       await transform(current),
@@ -196,7 +215,7 @@ class SnapshotBackupService {
     bool advanceRevision = true,
   }) async {
     if (expectedRevision != coordinator.revision) {
-      throw StateError('Local data changed. Refresh the import preview.');
+      throw SnapshotRevisionConflict();
     }
     final stagedNext = LocalSnapshot.decode(
       next.encode(),
@@ -226,6 +245,9 @@ class SnapshotBackupService {
     }
     for (final store in _stores.values) {
       store.validate(state.stores[store.name] ?? {});
+    }
+    if (state.stores.containsKey('training_plans')) {
+      const TrainingPlanSectionCodec().encode(state);
     }
     if (state.stores.containsKey('equipment')) {
       const EquipmentSectionCodec().encode(state);

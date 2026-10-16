@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'recovery_plan.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -33,10 +34,7 @@ void main() {
     await service.applyLocalState(
       LocalSnapshot(
         revision: before.revision,
-        stores: {
-          ...before.stores,
-          'training_plans': {'plan': 'After'},
-        },
+        stores: {...before.stores, 'training_plans': recoveryPlan('After')},
       ),
       expectedRevision: before.revision,
     );

@@ -14,6 +14,12 @@ TrainingPlanArchive _$TrainingPlanArchiveFromJson(Map<String, dynamic> json) =>
                 TrainingPlanArchiveRecord.fromJson(e as Map<String, dynamic>),
           )
           .toList(),
+      activePlanId: json['active_plan_id'] as String?,
+      configuration: json['configuration'] == null
+          ? null
+          : TrainingPlanConfigArchive.fromJson(
+              json['configuration'] as Map<String, dynamic>,
+            ),
       weekInCycle: ArchivePreference.fromJson(
         json['week_in_cycle'] as Map<String, dynamic>,
       ),
@@ -29,6 +35,8 @@ Map<String, dynamic> _$TrainingPlanArchiveToJson(
   TrainingPlanArchive instance,
 ) => <String, dynamic>{
   'plans': instance.plans.map((e) => e.toJson()).toList(),
+  'active_plan_id': instance.activePlanId,
+  'configuration': instance.configuration?.toJson(),
   'week_in_cycle': instance.weekInCycle.toJson(),
   'cycle_start_date': instance.cycleStartDate.toJson(),
   'modified_at': instance.modifiedAt?.toIso8601String(),
@@ -36,8 +44,13 @@ Map<String, dynamic> _$TrainingPlanArchiveToJson(
 
 TrainingPlanArchiveRecord _$TrainingPlanArchiveRecordFromJson(
   Map<String, dynamic> json,
-) => TrainingPlanArchiveRecord(id: json['id'] as String);
+) => TrainingPlanArchiveRecord(
+  id: json['id'] as String,
+  plan: TrainingPlanContentArchive.fromJson(
+    json['plan'] as Map<String, dynamic>,
+  ),
+);
 
 Map<String, dynamic> _$TrainingPlanArchiveRecordToJson(
   TrainingPlanArchiveRecord instance,
-) => <String, dynamic>{'id': instance.id};
+) => <String, dynamic>{'id': instance.id, 'plan': instance.plan.toJson()};

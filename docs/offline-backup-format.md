@@ -98,3 +98,18 @@ normal writes while a tracked workout is active. Public export/import operations
 retain the tracked-workout guard. Upload reconciliation uses the normal operation
 to re-key Activities, heart rate streams, and Feedback together, preserving local
 annotation timestamps and synchronization metadata.
+
+Training Plan state stores a single `active_state` unit: `plans` (zero or one),
+`active_plan_id`, full `configuration`, `week_in_cycle`, `cycle_start_date`, and
+nullable `modified_at`. Each plan record contains its full ordered schedule,
+workout targets, interval phases, and run/walk phases. A saved empty plan counts
+as one plan; no saved plan counts as zero. Schedule dates use `YYYY-MM-DD` civil
+dates so restoring across time zones keeps the same day. Durations use seconds,
+including supported microsecond precision. Cycles, content, and configuration
+share one modification time; unknown legacy recency remains null.
+
+Saved or restored plans load before generation. The first read establishes the
+current input baseline; subsequent activity/profile/configuration/cycle changes
+can regenerate using the existing engine. Generation publishes only against its
+captured local revision, so a concurrent restore cannot be overwritten. Cycle
+reset is one recoverable state update and retains the saved configuration.
