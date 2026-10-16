@@ -52,7 +52,9 @@ void main() {
     stores: {
       ...before.stores,
       'training_plans': {'plan': 'After'},
-      'equipment': {'shoe': 'After'},
+      'equipment': {
+        'shoe': {'id': 'shoe', 'name': 'After', 'category': 'daily_trainer'},
+      },
       'preferences': {'athlete_name': 'After'},
     },
   );

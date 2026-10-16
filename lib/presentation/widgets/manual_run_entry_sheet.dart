@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../providers/activities_provider.dart';
+import '../providers/equipment_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -198,6 +199,10 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
         0.0;
     if (!isFormValid || dist <= 0) return;
 
+    await _saveManualRun(dist, totalSeconds);
+  }
+
+  Future<void> _saveManualRun(double dist, int totalSeconds) async {
     setState(() => _isSubmitting = true);
 
     try {
@@ -285,21 +290,10 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
         labelText: 'Shoe (Optional)',
         prefixIcon: Icon(Icons.roller_skating_outlined),
       ),
-      items: const [
-        DropdownMenuItem(value: null, child: Text('None / Default')),
-        DropdownMenuItem(value: 'daily_trainer', child: Text('Daily Trainer')),
-        DropdownMenuItem(
-          value: 'tempo_shoe',
-          child: Text('Tempo / Speed Shoe'),
-        ),
-        DropdownMenuItem(
-          value: 'race_shoe',
-          child: Text('Race Day Plated Shoe'),
-        ),
-        DropdownMenuItem(
-          value: 'recovery_shoe',
-          child: Text('Recovery / Max Cushion'),
-        ),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('None / Default')),
+        for (final shoe in ref.watch(equipmentProvider).asData?.value ?? [])
+          DropdownMenuItem(value: shoe.id, child: Text(shoe.name)),
       ],
       onChanged: (val) => setState(() => _selectedShoeId = val),
     );
@@ -335,6 +329,45 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
     );
   }
 
+  List<Widget> _buildFields(bool isDark) => [
+    _buildGrabHandle(isDark),
+    _buildHeader(context),
+    const SizedBox(height: 16),
+    _buildNameField(),
+    const SizedBox(height: 16),
+    _DateTimeSection(
+      selectedDateTime: _selectedDateTime,
+      dateError: _dateError,
+      onPickDate: _pickDate,
+      onPickTime: _pickTime,
+    ),
+    const SizedBox(height: 16),
+    _DistanceSection(
+      controller: _distanceController,
+      onChanged: (_) => setState(() {}),
+    ),
+    const SizedBox(height: 16),
+    _DurationPaceSection(
+      hoursController: _hoursController,
+      minutesController: _minutesController,
+      secondsController: _secondsController,
+      durationError: _durationError,
+      paceString: _calculatePace(),
+      isDark: isDark,
+      onChanged: (_) => setState(() {}),
+    ),
+    const SizedBox(height: 20),
+    _RpeSelectorSection(
+      rpe: _rpe,
+      isDark: isDark,
+      onRpeChanged: (value) => setState(() => _rpe = value),
+    ),
+    const SizedBox(height: 16),
+    _buildShoeDropdown(),
+    const SizedBox(height: 24),
+    _buildSubmitButton(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -352,44 +385,7 @@ class _ManualRunEntrySheetState extends ConsumerState<ManualRunEntrySheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildGrabHandle(isDark),
-              _buildHeader(context),
-              const SizedBox(height: 16),
-              _buildNameField(),
-              const SizedBox(height: 16),
-              _DateTimeSection(
-                selectedDateTime: _selectedDateTime,
-                dateError: _dateError,
-                onPickDate: _pickDate,
-                onPickTime: _pickTime,
-              ),
-              const SizedBox(height: 16),
-              _DistanceSection(
-                controller: _distanceController,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 16),
-              _DurationPaceSection(
-                hoursController: _hoursController,
-                minutesController: _minutesController,
-                secondsController: _secondsController,
-                durationError: _durationError,
-                paceString: _calculatePace(),
-                isDark: isDark,
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 20),
-              _RpeSelectorSection(
-                rpe: _rpe,
-                isDark: isDark,
-                onRpeChanged: (value) => setState(() => _rpe = value),
-              ),
-              const SizedBox(height: 16),
-              _buildShoeDropdown(),
-              const SizedBox(height: 24),
-              _buildSubmitButton(),
-            ],
+            children: _buildFields(isDark),
           ),
         ),
       ),
@@ -559,6 +555,24 @@ class _DurationPaceSection extends StatelessWidget {
     );
   }
 
+  Widget _durationInput(
+    String unit,
+    String label,
+    TextEditingController controller,
+  ) => Expanded(
+    child: TextFormField(
+      key: Key('manual_run_${unit}_input'),
+      controller: controller,
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: unit == 'hours' ? '0' : '00',
+      ),
+      onChanged: onChanged,
+      validator: unit == 'hours' ? null : _validateSexagesimal,
+    ),
+  );
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -568,49 +582,11 @@ class _DurationPaceSection extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: TextFormField(
-                key: const Key('manual_run_hours_input'),
-                controller: hoursController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  labelText: 'Hours',
-                  hintText: '0',
-                ),
-                onChanged: onChanged,
-              ),
-            ),
+            _durationInput('hours', 'Hours', hoursController),
             const SizedBox(width: 8),
-            Expanded(
-              child: TextFormField(
-                key: const Key('manual_run_minutes_input'),
-                controller: minutesController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  labelText: 'Minutes',
-                  hintText: '00',
-                ),
-                onChanged: onChanged,
-                validator: _validateSexagesimal,
-              ),
-            ),
+            _durationInput('minutes', 'Minutes', minutesController),
             const SizedBox(width: 8),
-            Expanded(
-              child: TextFormField(
-                key: const Key('manual_run_seconds_input'),
-                controller: secondsController,
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  labelText: 'Seconds',
-                  hintText: '00',
-                ),
-                onChanged: onChanged,
-                validator: _validateSexagesimal,
-              ),
-            ),
+            _durationInput('seconds', 'Seconds', secondsController),
           ],
         ),
         if (durationError case final error?) ...[

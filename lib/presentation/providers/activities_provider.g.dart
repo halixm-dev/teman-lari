@@ -178,7 +178,7 @@ final class ActivitiesNotifierProvider
 }
 
 String _$activitiesNotifierHash() =>
-    r'2493103a9e71d9b054b8c77e3209f69df9a0570a';
+    r'2dd462e62fa74b08e2cac4e1ea06814b29debec1';
 
 abstract class _$ActivitiesNotifier extends $AsyncNotifier<List<Activity>> {
   FutureOr<List<Activity>> build();
@@ -235,4 +235,4 @@ final class RunningStatsProvider
   }
 }
 
-String _$runningStatsHash() => r'b709d2524e69e991f2fc1c62a4a642075ccceff3';
+String _$runningStatsHash() => r'a70ce40fda4e43f1f8ba9c75fc81d02c64244207';

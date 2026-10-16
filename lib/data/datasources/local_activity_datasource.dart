@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/activity_model.dart';
+import 'local_equipment_datasource.dart';
 import '../backup/local_data_coordinator.dart';
 
 /// Transparent proxy around Hive [Box] ensuring that negative integer IDs
@@ -164,8 +165,12 @@ class _SafeBox implements Box {
 
 class LocalActivityDataSource {
   final LocalDataCoordinator coordinator;
-  LocalActivityDataSource({LocalDataCoordinator? coordinator})
-    : coordinator = coordinator ?? LocalDataCoordinator.shared;
+  final DateTime Function() clock;
+  LocalActivityDataSource({
+    LocalDataCoordinator? coordinator,
+    DateTime Function()? clock,
+  }) : coordinator = coordinator ?? LocalDataCoordinator.shared,
+       clock = clock ?? DateTime.now;
 
   static const _activitiesBoxName = 'activities';
   static const _hrStreamsBoxName = 'hr_streams';
@@ -231,6 +236,33 @@ class LocalActivityDataSource {
         if (streams != null && streams.isOpen) await streams.flush();
       });
 
+  Future<ActivityModel> _assignment(ActivityModel activity) async {
+    final shoeId = activity.shoeId;
+    await _ensureShoe(shoeId);
+    final raw = (await activitiesBox).get(_toKey(activity.id));
+    final old = raw is Map
+        ? ActivityModel.fromJson(
+            jsonDecode(raw['data'] as String) as Map<String, dynamic>,
+          )
+        : null;
+    final changed = old?.shoeId != shoeId;
+    return activity.copyWith(
+      shoeAssignmentModifiedAt: changed
+          ? clock().toUtc()
+          : old?.shoeAssignmentModifiedAt,
+    );
+  }
+
+  Future<void> _ensureShoe(String? shoeId) async {
+    if (shoeId == null) return;
+    final shoes = await LocalEquipmentDataSource(
+      coordinator: coordinator,
+    ).getAll();
+    if (!shoes.any((shoe) => shoe.id == shoeId)) {
+      throw ArgumentError('Activity references a missing shoe.');
+    }
+  }
+
   /// Converts an activity ID to a valid Hive box key.
   /// 32-bit non-negative integers (0 to 0xFFFFFFFF) can be stored directly as int keys,
   /// while negative IDs and 64-bit IDs must be stored as String keys to satisfy Hive constraints.
@@ -256,7 +288,8 @@ class LocalActivityDataSource {
       final box = await activitiesBox;
       final Map<dynamic, Map<String, dynamic>> entries = {};
       final now = DateTime.now().millisecondsSinceEpoch;
-      for (final activity in activities) {
+      for (final input in activities) {
+        final activity = await _assignment(input);
         entries[_toKey(activity.id)] = {
           'id': activity.id,
           'data': jsonEncode(activity.toJson()),
@@ -273,6 +306,7 @@ class LocalActivityDataSource {
 
   /// Saves a single activity into Hive.
   Future<void> _saveActivity(ActivityModel activity) async {
+    activity = await _assignment(activity);
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
@@ -288,6 +322,7 @@ class LocalActivityDataSource {
 
   /// Updates an existing activity, preserving original synced_at timestamp if present.
   Future<void> _updateActivity(ActivityModel activity) async {
+    activity = await _assignment(activity);
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
@@ -356,6 +391,12 @@ class LocalActivityDataSource {
               jsonDecode(existingRaw['data'] as String),
             );
             syncedAt = existingRaw['synced_at'] as int? ?? now;
+            merged = merged.copyWith(
+              shoeId: existingModel.shoeAssignmentModifiedAt != null
+                  ? existingModel.shoeId
+                  : existingModel.shoeId ?? remote.shoeId,
+              shoeAssignmentModifiedAt: existingModel.shoeAssignmentModifiedAt,
+            );
             if (remote.perceivedExertion == null &&
                 existingModel.perceivedExertion != null) {
               merged = merged.copyWith(
@@ -364,6 +405,7 @@ class LocalActivityDataSource {
             }
           } catch (_) {}
         }
+        await _ensureShoe(merged.shoeId);
         entries[key] = {
           'id': merged.id,
           'data': jsonEncode(merged.toJson()),

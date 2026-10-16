@@ -52,3 +52,19 @@ These additions retain section identities and schema version 1.
 Production web builds inject the pubspec version through `build.sh`; ad-hoc web
 builds without `APP_VERSION` identify themselves as `development`. Native reads
 packaged metadata over the local platform channel, without a network request.
+
+Equipment records use stable string IDs, a name, a functional `category`, nullable
+`foam_chemistry`, nullable positive meter overrides `lifecycle_target_meters` and
+`performance_target_meters`, and nullable `created_at`/`modified_at` instants.
+Categories are `daily_trainer`, `max_cushion_recovery`, `tempo_workout`, and
+`race_day_plated`; chemistry is `supercritical_peba_tpu` or `traditional_eva`.
+A known creation instant identifies the original pair and cannot be changed by
+normal edits. Unknown legacy creation/modification times remain null.
+Assignments are `{activity_id, shoe_id, modified_at}` in
+`equipment.activity_assignments`; their IDs must resolve to included Activities
+and shoes. A null shoe_id with a known modified_at records an explicit cleared assignment; untouched unassigned Activities have no assignment record. Equipment counts include both shoe records and assignments.
+Normal shoe/assignment edits receive UTC edit times, while remote refreshes and
+identity changes preserve assignment recency. Calendar-invalid timestamps,
+unsupported enum variants, nonpositive overrides, inconsistent record keys and
+dangling assignments fail safely before applying a snapshot or exporting it.
+The Manual Run dropdown lists persisted shoes; it does not invent gear records.

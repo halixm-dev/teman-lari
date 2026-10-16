@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/activity_model.dart';
+import '../../domain/entities/shoe_equipment.dart';
 import 'snapshot_store.dart';
 import 'durable_preference_checkpoint.dart';
 
@@ -36,6 +37,7 @@ class HiveSnapshotStore extends SnapshotStore {
   @override
   void validate(Map<String, Object?> records) {
     super.validate(records);
+    if (name == 'equipment') _validateEquipment(records);
     if (name != 'activities' && name != 'hr_streams') return;
     for (final entry in records.values) {
       final row = entry as Map;
@@ -45,6 +47,19 @@ class HiveSnapshotStore extends SnapshotStore {
       } else {
         (data as List).map((sample) => (sample as num).toDouble()).toList();
       }
+    }
+  }
+
+  void _validateEquipment(Map<String, Object?> records) {
+    try {
+      for (final entry in records.entries) {
+        final shoe = ShoeEquipment.fromJson(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+        if (shoe.id != entry.key) throw StateError('Invalid shoe identity.');
+      }
+    } catch (error) {
+      throw StateError('Stored shoe equipment cannot be read safely: $error');
     }
   }
 

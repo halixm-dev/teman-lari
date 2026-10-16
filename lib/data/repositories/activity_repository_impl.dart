@@ -193,6 +193,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
         perceivedExertion:
             localModel.perceivedExertion ?? remoteModel.perceivedExertion,
         workoutType: localModel.workoutType ?? remoteModel.workoutType,
+        shoeId: localModel.shoeAssignmentModifiedAt != null
+            ? localModel.shoeId
+            : localModel.shoeId ?? remoteModel.shoeId,
+        shoeAssignmentModifiedAt: localModel.shoeAssignmentModifiedAt,
       );
 
       await localDataSource.updateLocalActivityId(localModel.id, mergedModel);
@@ -247,6 +251,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
           activity.avgHeartRate != null ||
           (hrData != null && hrData.isNotEmpty),
       perceivedExertion: activity.perceivedExertion,
+      shoeId: activity.shoeId,
+      shoeAssignmentModifiedAt: activity.shoeAssignmentModifiedAt,
     );
 
     await localDataSource.coordinator.write(() async {
@@ -347,6 +353,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
       avgCadence: model.averageCadence,
       sufferScore: model.sufferScore,
       perceivedExertion: model.perceivedExertion,
+      shoeId: model.shoeId,
+      shoeAssignmentModifiedAt: model.shoeAssignmentModifiedAt,
     );
   }
 

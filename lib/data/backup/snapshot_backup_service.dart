@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'archive/snapshot_archive_codec.dart';
+import 'archive/equipment_section.dart';
 import 'transport/backup_file_transport.dart';
 import 'package:flutter/foundation.dart';
 
@@ -200,6 +201,9 @@ class SnapshotBackupService {
     }
     for (final store in _stores.values) {
       store.validate(state.stores[store.name] ?? {});
+    }
+    if (state.stores.containsKey('equipment')) {
+      const EquipmentSectionCodec().encode(state);
     }
     state.encode();
   }
