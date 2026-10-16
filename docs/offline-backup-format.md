@@ -68,3 +68,33 @@ identity changes preserve assignment recency. Calendar-invalid timestamps,
 unsupported enum variants, nonpositive overrides, inconsistent record keys and
 dangling assignments fail safely before applying a snapshot or exporting it.
 The Manual Run dropdown lists persisted shoes; it does not invent gear records.
+
+Rehab Feedback uses one stable record per stored dual-window check-in. `id` is a
+nonempty string. `activity_id` is an exact nonzero decimal Activity ID and
+`injury_site` is one of `achilles`, `knee`, `shin`, `plantarFascia`, `hamstring`.
+The pair Activity + Injury Site is immutable for a matching stable feedback ID;
+Smart Merge compares it after Activity reference remapping.
+
+| Feedback field | Meaning |
+| --- | --- |
+| post_run_pain | Nullable finite VAS score from 0 to 10 |
+| post_run_recorded_at | Required instant when post-run pain is present |
+| morning_after_pain | Nullable finite VAS score from 0 to 10 |
+| morning_stiffness | Nullable boolean; absence never means false |
+| morning_after_recorded_at | Required instant when morning pain is present |
+| modified_at | Actual local edit instant, imported instant, or unknown null |
+
+At least one window is required. A recording instant cannot appear without its
+window. Morning stiffness belongs to the morning window; both recording times
+must be in chronological order when present. Instants export in UTC. Normal
+check-in saves stamp their actual edit time; restoration and pure Activity
+identity migration preserve recorded modification times. No rehabilitation
+threshold, progression, or readiness behavior is inferred by this storage layer.
+
+`transformLocalState` is the recoverable normal-write operation beneath the
+backup boundary. It reads, transforms, validates, journals, and commits under one
+coordinator lease, with an optional expected revision. It allows legitimate
+normal writes while a tracked workout is active. Public export/import operations
+retain the tracked-workout guard. Upload reconciliation uses the normal operation
+to re-key Activities, heart rate streams, and Feedback together, preserving local
+annotation timestamps and synchronization metadata.

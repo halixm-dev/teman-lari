@@ -145,7 +145,11 @@ void main() {
       for (final name in ['training_plans', 'equipment', 'rehab_feedback']) {
         final box = await Hive.openBox(name);
         await box.put('legacy', {'id': 'must-survive'});
-        await check(service.prepareExport()).throws<StateError>();
+        if (name == 'rehab_feedback') {
+          await check(service.prepareExport()).throws<FormatException>();
+        } else {
+          await check(service.prepareExport()).throws<StateError>();
+        }
         await box.clear();
       }
     },

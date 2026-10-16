@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/activity_model.dart';
 import '../../domain/entities/shoe_equipment.dart';
+
+import '../../domain/entities/rehab_feedback.dart';
 import 'snapshot_store.dart';
 import 'durable_preference_checkpoint.dart';
 
@@ -38,6 +40,17 @@ class HiveSnapshotStore extends SnapshotStore {
   void validate(Map<String, Object?> records) {
     super.validate(records);
     if (name == 'equipment') _validateEquipment(records);
+
+    if (name == 'rehab_feedback') {
+      for (final entry in records.entries) {
+        final feedback = RehabFeedback.fromJson(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+        if (feedback.id != entry.key) {
+          throw FormatException('Feedback key differs from ID.');
+        }
+      }
+    }
     if (name != 'activities' && name != 'hr_streams') return;
     for (final entry in records.values) {
       final row = entry as Map;

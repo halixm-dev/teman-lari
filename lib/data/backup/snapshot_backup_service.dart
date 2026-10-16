@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'archive/snapshot_archive_codec.dart';
 import 'archive/equipment_section.dart';
+
+import 'archive/rehab_feedback_section.dart';
 import 'transport/backup_file_transport.dart';
 import 'package:flutter/foundation.dart';
 
@@ -169,7 +172,29 @@ class SnapshotBackupService {
   Future<void> applyLocalState(
     LocalSnapshot next, {
     required int expectedRevision,
-  }) => coordinator.snapshot(() async {
+  }) => coordinator.snapshot(() => _applyState(next, expectedRevision));
+
+  /// Recoverable normal edit; tracked workouts may continue recording.
+  Future<void> transformLocalState(
+    FutureOr<LocalSnapshot> Function(LocalSnapshot) transform, {
+    int? expectedRevision,
+  }) => coordinator.write(() async {
+    final current = await _read();
+    if (expectedRevision != null && expectedRevision != current.revision) {
+      throw StateError('Local data changed before the edit.');
+    }
+    await _applyState(
+      await transform(current),
+      current.revision,
+      advanceRevision: false,
+    );
+  });
+
+  Future<void> _applyState(
+    LocalSnapshot next,
+    int expectedRevision, {
+    bool advanceRevision = true,
+  }) async {
     if (expectedRevision != coordinator.revision) {
       throw StateError('Local data changed. Refresh the import preview.');
     }
@@ -189,10 +214,10 @@ class SnapshotBackupService {
       await _rollback(before);
       rethrow;
     }
-    coordinator.revision++;
+    if (advanceRevision) coordinator.revision++;
     await onPhase?.call(SnapshotPhase.committed, null);
     await _cleanup();
-  });
+  }
 
   void _validateStores(LocalSnapshot state) {
     if (state.stores.length != _stores.length ||
@@ -204,6 +229,9 @@ class SnapshotBackupService {
     }
     if (state.stores.containsKey('equipment')) {
       const EquipmentSectionCodec().encode(state);
+    }
+    if (state.stores.containsKey('rehab_feedback')) {
+      const RehabFeedbackSectionCodec().encode(state);
     }
     state.encode();
   }

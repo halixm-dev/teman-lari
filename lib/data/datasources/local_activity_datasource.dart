@@ -5,6 +5,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../models/activity_model.dart';
 import 'local_equipment_datasource.dart';
 import '../backup/local_data_coordinator.dart';
+import '../backup/snapshot_backup_service.dart';
+import 'local_activity_identity_migration.dart';
 
 /// Transparent proxy around Hive [Box] ensuring that negative integer IDs
 /// and 64-bit integer IDs do not trigger Hive's [Frame.assertKey] error,
@@ -166,10 +168,15 @@ class _SafeBox implements Box {
 class LocalActivityDataSource {
   final LocalDataCoordinator coordinator;
   final DateTime Function() clock;
+  final SnapshotBackupService? backupService;
   LocalActivityDataSource({
     LocalDataCoordinator? coordinator,
     DateTime Function()? clock,
-  }) : coordinator = coordinator ?? LocalDataCoordinator.shared,
+    this.backupService,
+  }) : coordinator =
+           coordinator ??
+           backupService?.coordinator ??
+           LocalDataCoordinator.shared,
        clock = clock ?? DateTime.now;
 
   static const _activitiesBoxName = 'activities';
@@ -273,14 +280,6 @@ class LocalActivityDataSource {
     return id.toString();
   }
 
-  /// Safely removes an entry by ID, checking both int and String keys.
-  Future<void> _deleteByKey(Box box, int id) async {
-    if (id >= 0 && id <= 0xFFFFFFFF) {
-      await box.delete(id);
-    }
-    await box.delete(id.toString());
-  }
-
   /// Saves a batch of activities additively into Hive.
   Future<void> _saveActivities(List<ActivityModel> activities) async {
     if (activities.isEmpty) return;
@@ -341,33 +340,15 @@ class LocalActivityDataSource {
     }
   }
 
-  /// Atomically re-keys a local workout (negative ID) to its new remote Strava ID upon upload.
+  /// Re-key the Activity, stream and check-ins in one recoverable normal edit.
   Future<void> _updateLocalActivityId(
     int oldLocalId,
     ActivityModel updatedModel,
-  ) async {
-    try {
-      final actBox = await activitiesBox;
-      await saveActivity(updatedModel);
-      await _deleteByKey(actBox, oldLocalId);
-
-      // Re-key associated heart rate stream if one exists
-      final hrBox = await hrStreamsBox;
-      final oldHrKey = _toKey(oldLocalId);
-      final hrEntry = hrBox.get(oldHrKey);
-      if (hrEntry != null) {
-        final newHrKey = _toKey(updatedModel.id);
-        if (hrEntry is Map) {
-          final data = Map<String, dynamic>.from(hrEntry);
-          data['activity_id'] = updatedModel.id;
-          await hrBox.put(newHrKey, data);
-          await _deleteByKey(hrBox, oldLocalId);
-        }
-      }
-    } catch (_) {
-      rethrow;
-    }
-  }
+  ) => migrateLocalActivityIdentity(
+    backupService ?? SnapshotBackupService(coordinator: coordinator),
+    oldLocalId,
+    updatedModel,
+  );
 
   /// Additively merges remote Strava activities into the local store,
   /// strictly preserving all local-only activities (id < 0) and
@@ -529,6 +510,14 @@ class LocalActivityDataSource {
   /// Clears all stored activities and heart rate streams.
   Future<void> _clearCache() async {
     try {
+      final feedback = Hive.isBoxOpen('rehab_feedback')
+          ? Hive.box('rehab_feedback')
+          : await Hive.openBox('rehab_feedback');
+      if (feedback.isNotEmpty) {
+        throw StateError(
+          'Cannot clear Activities while Rehab Feedback is linked.',
+        );
+      }
       final boxAct = await activitiesBox;
       final boxHr = await hrStreamsBox;
       await boxAct.clear();

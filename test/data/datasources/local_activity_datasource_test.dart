@@ -4,14 +4,17 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teman_lari/data/datasources/local_activity_datasource.dart';
 import 'package:teman_lari/data/models/activity_model.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late LocalActivityDataSource dataSource;
   late Directory tempDir;
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     // Create a temporary directory for Hive testing
     tempDir = await Directory.systemTemp.createTemp('hive_test_dir');
     Hive.init(tempDir.path);
