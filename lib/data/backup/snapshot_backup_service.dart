@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
+import 'import_preview.dart';
+import 'archive/snapshot_archive_validator.dart';
 
 import 'archive/snapshot_archive_codec.dart';
 import 'archive/training_plan_section.dart';
@@ -17,6 +20,7 @@ import 'snapshot_store.dart';
 import 'snapshot_store_adapters.dart';
 
 export 'snapshot_store.dart';
+export 'import_preview.dart';
 export 'training_plan_persistence.dart' show TrainingPlanBackupOperations;
 
 enum BackupExportPhase { idle, preparing, saving }
@@ -58,6 +62,7 @@ class SnapshotBackupService {
   final String appVersion;
   final Future<String> Function()? versionReader;
   final exportPhase = ValueNotifier<BackupExportPhase>(BackupExportPhase.idle);
+  final importPhase = ValueNotifier<BackupImportPhase>(BackupImportPhase.idle);
   final SnapshotPhaseObserver? onPhase;
   final Future<bool> Function(int bytes)? checkAvailableSpace;
   final Map<String, SnapshotStore> _stores = {};
@@ -157,6 +162,34 @@ class SnapshotBackupService {
           exportPhase.value = BackupExportPhase.idle;
         }
       });
+
+  Future<BackupImportPreview> prepareImport(Uint8List bytes) {
+    if (bytes.length > SnapshotArchiveLimits.maxBytes) {
+      return Future.error(FormatException('Backup exceeds 50 MiB.'));
+    }
+    final selected = Uint8List.fromList(bytes);
+    return coordinator.snapshot(() => _prepareImport(selected));
+  }
+
+  Future<BackupImportPreview?> importBackup(BackupFileTransport transport) =>
+      coordinator.snapshot(() async {
+        importPhase.value = BackupImportPhase.picking;
+        try {
+          final bytes = await transport.pick();
+          return bytes == null ? null : await _prepareImport(bytes);
+        } finally {
+          importPhase.value = BackupImportPhase.idle;
+        }
+      });
+
+  Future<BackupImportPreview> _prepareImport(Uint8List bytes) async {
+    importPhase.value = BackupImportPhase.validating;
+    try {
+      return await compute(_decodeImport, (bytes, await _read()));
+    } finally {
+      importPhase.value = BackupImportPhase.idle;
+    }
+  }
 
   static String _newSnapshotId() {
     final random = Random.secure();
@@ -342,3 +375,10 @@ Future<String> _packagedVersion() async {
   final package = await PackageInfo.fromPlatform();
   return '${package.version}+${package.buildNumber}';
 }
+
+BackupImportPreview _decodeImport((Uint8List, LocalSnapshot) input) =>
+    BackupImportPreview(
+      archiveJson: validateSnapshotArchive(input.$1),
+      localRevision: input.$2.revision,
+      localCounts: const SnapshotArchiveCodec().counts(input.$2),
+    );

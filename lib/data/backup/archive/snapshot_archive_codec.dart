@@ -53,6 +53,18 @@ class SnapshotArchiveCodec {
     );
   }
 
+  Map<String, int> counts(LocalSnapshot snapshot) {
+    final data = _data(snapshot);
+    return {
+      'profile': 5,
+      'activities': data.activities.length,
+      'heart_rate_streams': data.heartRateStreams.length,
+      'training_plan_state': data.trainingPlanState.recordCount,
+      'equipment': data.equipment.recordCount,
+      'rehab_feedback': data.rehabFeedback.recordCount,
+    };
+  }
+
   SnapshotArchiveData _data(LocalSnapshot snapshot) {
     final prefs = snapshot.stores['preferences'] ?? {};
     final activities = const ActivitySectionCodec().encode(snapshot);

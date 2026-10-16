@@ -1,6 +1,6 @@
 # 06: Preview a validated backup before importing
 
-Status: ready-for-agent
+Status: claimed
 
 **What to build:** Let an athlete select a .tlbackup file on mobile or web, inspect its full contents and intended import mode, and cancel without changing local data.
 
@@ -19,4 +19,5 @@ Status: ready-for-agent
 - [ ] Test picker cancellation, invalid-file errors, progress, mode defaults, preview cancellation, active-workout refusal, semantic labels, and text scaling through focused Settings tests.
 
 **Validation:** Use the approved Snapshot Backup service boundary plus focused Settings widget tests where applicable. New assertions use package:checks. Run targeted tests while implementing; before committing code, run dart format ., the standards guardrail, zero-warning analysis, and the full Flutter test suite. Check web compilation for platform-sensitive changes.
+
 
