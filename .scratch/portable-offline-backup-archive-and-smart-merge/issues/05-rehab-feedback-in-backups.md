@@ -1,6 +1,6 @@
 # 05: Preserve Rehab Feedback in offline backups
 
-Status: claimed
+Status: resolved
 
 **What to build:** Include stored dual-window Rehab Feedback in the shared Snapshot Backup so a returning runner's recorded check-ins survive moving installations.
 
@@ -10,7 +10,7 @@ Status: claimed
 
 - [x] Add minimal durable Rehab Feedback records for supported post-run and morning-after check-ins, pain/stiffness information, Injury Site, stable IDs, related Activity identifiers, and meaningful timestamps consistent with the rehabilitation ADR.
 - [x] Add strict serialization and validation to the version 1 Rehab Feedback section, with explicit modification times and registration in shared snapshot coordination/recovery.
-- [ ] Populate nonempty feedback in service exports and show its count in the existing Settings backup summary; empty sections must mean no stored feedback.
+- [x] Populate nonempty feedback in service exports and show its count in the existing Settings backup summary; empty sections must mean no stored feedback.
 - [x] Support valid imported feedback without needing a new check-in screen or clinical engine; persistence and faithful archive transport are the scope.
 - [x] Test populated dual-window feedback through export, decode, durable application, and reopening stores. Verify both windows and linked identities survive.
 - [x] Reject invalid required references and incompatible stable-ID identities before mutation; propagate storage/serialization failures rather than silently dropping feedback.
@@ -35,4 +35,10 @@ The annotation regression failed against old camelCase JSON keys and passes
 with snake_case preservation. The invalid UTC offset regression also failed
 before its fix. Formatting, the standards guardrail, zero-warning analysis,
 and release web compilation with Wasm dry run pass on the combined branch.
-Ticket 05 remains claimed until ticket 03 shared Settings counts are integrated.
+Shared Settings counts are integrated in ticket 03 commit
+`cda97a177713c7578bacaaf5a37ffdb1d81f7041`. Verified that
+`SnapshotBackupService.readBackupCounts()` reads the strict Rehab Feedback
+section's `recordCount`, `backupCountsProvider` exposes it, and the Settings
+backup card renders `Rehab feedback records` from that count. Ticket 03's
+combined validation passes all 478 tests plus the 9 focused Settings tests.
+This follow-up only closes the ticket; it changes no application code.
