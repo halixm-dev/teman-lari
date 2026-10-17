@@ -211,6 +211,16 @@ void main() {
       await check(service.prepareExport()).throws<StateError>();
     },
   );
+  test(
+    'export refuses calendar-normalized corruption in original timestamps',
+    () async {
+      final local = LocalActivityDataSource(coordinator: service.coordinator);
+      await local.saveActivities([
+        activity(-7, 'Run').copyWith(startDate: '2020-02-30T03:04:05Z'),
+      ]);
+      await check(service.prepareExport()).throws<FormatException>();
+    },
+  );
   test('guest export completes with network access disabled', () async {
     final file = await HttpOverrides.runZoned(
       service.prepareExport,

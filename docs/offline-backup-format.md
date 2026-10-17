@@ -113,3 +113,23 @@ current input baseline; subsequent activity/profile/configuration/cycle changes
 can regenerate using the existing engine. Generation publishes only against its
 captured local revision, so a concurrent restore cannot be overwritten. Cycle
 reset is one recoverable state update and retains the saved configuration.
+
+Import selection and preview are read-only operations on the same service.
+`prepareImport(bytes)` validates the complete selected UTF-8 archive and returns
+an immutable `BackupImportPreview`; `importBackup(transport)` includes file
+selection, with null meaning cancellation. `importPhase` announces selection and
+validation. Neither operation writes local data or uses remote repositories.
+
+Preview metadata and local/archive section counts are cached for rendering.
+The content binding retains all selected validated JSON, including optional
+metadata, independently of caller-owned bytes or mutable DTO copies. The local
+revision is captured under the same coordination lease. Confirmed apply must
+check that revision and obtain renewed confirmation when the result changes.
+
+The validator checks required fields before generated JSON factories. It rejects
+missing values rather than turning them into explicit clears, unsupported data
+sections/record variants, malformed calendar dates or timezone offsets,
+non-finite measurements, fractional integer fields, duplicate IDs, count
+mismatches, dangling references, and identities outside the active platform's
+exact range. Unknown optional metadata may be ignored by supported consumers.
+Import starts in Smart Merge mode; replacement remains a separate choice.

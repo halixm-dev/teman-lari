@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -44,6 +45,50 @@ void main() {
       final selected = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
       selected['app_version'] = 'modified';
       check(preview.archive.appVersion).equals('1.0.0+1');
+    },
+  );
+  test(
+    'queued preview owns selected bytes and binds changed local revision',
+    () async {
+      final bytes = Uint8List.fromList(
+        await File(
+          'test/fixtures/offline-backup-v1-empty.tlbackup',
+        ).readAsBytes(),
+      );
+      final initial = await service.readLocalState();
+      final release = Completer<void>();
+      final write = service.coordinator.write(() => release.future);
+      final pending = service.prepareImport(bytes);
+      bytes.fillRange(0, bytes.length, 0);
+      release.complete();
+      await write;
+      final preview = await pending;
+      check(preview.snapshotId).equals('fixture');
+      check(preview.localRevision).equals(initial.revision + 1);
+      check(
+        () => preview.localCounts['activities'] = 999,
+      ).throws<UnsupportedError>();
+      check(
+        () => (preview.archiveJson['data'] as Map)['activities'] = [],
+      ).throws<UnsupportedError>();
+    },
+  );
+
+  test(
+    'reused snapshot identity cannot hide different selected contents',
+    () async {
+      final bytes = await File(
+        'test/fixtures/offline-backup-v1-empty.tlbackup',
+      ).readAsBytes();
+      final first = await service.prepareImport(bytes);
+      final modified = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+      modified['app_version'] = '2.0.0+2';
+      final second = await service.prepareImport(
+        Uint8List.fromList(utf8.encode(jsonEncode(modified))),
+      );
+      check(second.snapshotId).equals(first.snapshotId);
+      check(second.archiveBinding == first.archiveBinding).isFalse();
+      check(first.appVersion).equals('1.0.0+1');
     },
   );
 }

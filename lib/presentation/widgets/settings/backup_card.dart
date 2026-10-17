@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/backup/snapshot_backup_service.dart';
 import '../../../data/backup/transport/backup_file_transport.dart';
 import '../../providers/backup_provider.dart';
+import 'backup_import_preview_dialog.dart';
 
 class BackupCard extends ConsumerStatefulWidget {
   const BackupCard({super.key});
@@ -47,6 +48,36 @@ class _BackupCardState extends ConsumerState<BackupCard> {
     }
   }
 
+  Future<void> _import() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    try {
+      final preview = await ref
+          .read(snapshotBackupServiceProvider)
+          .importBackup(ref.read(backupFileTransportProvider));
+      if (!mounted) return;
+      if (preview == null) {
+        setState(
+          () => _message = 'Import cancelled. Local data was not changed.',
+        );
+      } else {
+        setState(() => _busy = false);
+        await showDialog<void>(
+          context: context,
+          builder: (_) => BackupImportPreviewDialog(preview: preview),
+        );
+        if (mounted) setState(() => _message = 'Local data was not changed.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Import failed: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = ref.watch(snapshotBackupServiceProvider);
@@ -68,10 +99,7 @@ class _BackupCardState extends ConsumerState<BackupCard> {
             const SizedBox(height: 12),
             const _BackupCounts(),
             const SizedBox(height: 16),
-            ValueListenableBuilder<BackupExportPhase>(
-              valueListenable: service.exportPhase,
-              builder: (context, phase, child) => _controls(phase),
-            ),
+            _operationControls(service),
             if (_message case final message?) ...[
               const SizedBox(height: 12),
               Semantics(liveRegion: true, child: Text(message)),
@@ -82,8 +110,21 @@ class _BackupCardState extends ConsumerState<BackupCard> {
     );
   }
 
-  Widget _controls(BackupExportPhase phase) {
-    final busy = _busy || phase != BackupExportPhase.idle;
+  Widget _operationControls(SnapshotBackupService service) =>
+      ValueListenableBuilder<BackupExportPhase>(
+        valueListenable: service.exportPhase,
+        builder: (context, phase, child) =>
+            ValueListenableBuilder<BackupImportPhase>(
+              valueListenable: service.importPhase,
+              builder: (_, importing, _) => _controls(phase, importing),
+            ),
+      );
+
+  Widget _controls(BackupExportPhase phase, BackupImportPhase importing) {
+    final busy =
+        _busy ||
+        phase != BackupExportPhase.idle ||
+        importing != BackupImportPhase.idle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -92,17 +133,26 @@ class _BackupCardState extends ConsumerState<BackupCard> {
           icon: const Icon(Icons.file_download_outlined),
           label: const Text('Export Backup'),
         ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: busy ? null : _import,
+          icon: const Icon(Icons.file_upload_outlined),
+          label: const Text('Import Backup'),
+        ),
         if (busy) ...[
           const SizedBox(height: 12),
           const LinearProgressIndicator(semanticsLabel: 'Backup in progress'),
           const SizedBox(height: 8),
           Semantics(
             liveRegion: true,
-            child: Text(
-              phase == BackupExportPhase.saving
-                  ? 'Choose where to save your backup…'
-                  : 'Preparing your backup…',
-            ),
+            child: Text(switch (importing) {
+              BackupImportPhase.picking => 'Choose a backup file…',
+              BackupImportPhase.validating => 'Checking your backup…',
+              BackupImportPhase.idle =>
+                phase == BackupExportPhase.saving
+                    ? 'Choose where to save your backup…'
+                    : 'Preparing your backup…',
+            }),
           ),
         ],
       ],

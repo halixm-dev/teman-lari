@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../models/activity_model.dart';
 import '../snapshot_store.dart';
 import 'snapshot_archive.dart';
+import 'snapshot_validation_values.dart';
 
 class ActivitySectionCodec {
   const ActivitySectionCodec();
@@ -20,6 +21,7 @@ class ActivitySectionCodec {
       throw StateError('Stored Activity identity is inconsistent.');
     }
     ensureExactIdentity(id);
+    archiveInstant(data['start_date']);
     final model = ActivityModel.fromJson(data);
     _validateMeasurements(model);
     return ArchiveActivity(

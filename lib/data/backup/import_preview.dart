@@ -10,6 +10,11 @@ enum BackupImportPhase { idle, picking, validating }
 class BackupImportPreview {
   final String _archiveJson;
   final int localRevision;
+  final String snapshotId;
+  final DateTime createdAt;
+  final int schemaVersion;
+  final String appVersion;
+  final Map<String, int> archiveCounts;
   final Map<String, int> localCounts;
 
   BackupImportPreview({
@@ -17,14 +22,20 @@ class BackupImportPreview {
     required this.localRevision,
     required Map<String, int> localCounts,
   }) : _archiveJson = jsonEncode(archiveJson),
-       localCounts = Map.unmodifiable(localCounts);
+       localCounts = Map.unmodifiable(localCounts),
+       snapshotId = archiveJson['snapshot_id'] as String,
+       createdAt = DateTime.parse(archiveJson['created_at'] as String).toUtc(),
+       schemaVersion = archiveJson['schema_version'] as int,
+       appVersion = archiveJson['app_version'] as String,
+       archiveCounts = Map.unmodifiable(
+         Map<String, int>.from(archiveJson['counts'] as Map),
+       );
 
   /// Content binding includes optional metadata and cannot be changed in place.
   String get archiveBinding => _archiveJson;
   SnapshotArchive get archive => SnapshotArchive.fromJson(
     jsonDecode(_archiveJson) as Map<String, dynamic>,
   );
-  Map<String, int> get archiveCounts => Map.unmodifiable(archive.counts);
   Map<String, dynamic> get archiveJson =>
       _freeze(jsonDecode(_archiveJson)) as Map<String, dynamic>;
 }
