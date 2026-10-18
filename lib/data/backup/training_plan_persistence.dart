@@ -16,6 +16,7 @@ class TrainingPlanPersistence {
   String? _inputs;
   String? _stored;
   String? _configurationInput;
+  int _epoch = 0;
   TrainingPlanPersistence(this.service);
 
   Future<TrainingPlanArchive?> _read() => service.coordinator.read(() async {
@@ -36,7 +37,9 @@ class TrainingPlanPersistence {
     required Future<TrainingPlan> Function(TrainingPlanConfig) generate,
   }) async {
     if (!service.coordinator.initialized) return generate(configuration);
+    final epoch = _epoch;
     final saved = await _read();
+    if (epoch != _epoch) return _restoredPlan();
     final stored = saved == null ? null : jsonEncode(saved.toJson());
     final plan = saved?.plans.firstOrNull;
     final configInput = jsonEncode(
@@ -55,6 +58,7 @@ class TrainingPlanPersistence {
       generate,
       saved,
       configInput,
+      epoch,
     );
   }
 
@@ -64,6 +68,7 @@ class TrainingPlanPersistence {
     Future<TrainingPlan> Function(TrainingPlanConfig) generate,
     TrainingPlanArchive? saved,
     String configInput,
+    int epoch,
   ) async {
     final revision = service.coordinator.revision;
     final effectiveConfig =
@@ -71,6 +76,7 @@ class TrainingPlanPersistence {
         ? configuration
         : saved?.configuration?.toDomain() ?? configuration;
     final generated = await generate(effectiveConfig);
+    if (epoch != _epoch) return _restoredPlan();
     if (revision != service.coordinator.revision) {
       return resolve(
         inputs: inputs,
@@ -81,15 +87,18 @@ class TrainingPlanPersistence {
     try {
       await _save(generated, effectiveConfig, revision);
     } on SnapshotRevisionConflict {
+      if (epoch != _epoch) return _restoredPlan();
       return resolve(
         inputs: inputs,
         configuration: configuration,
         generate: generate,
       );
     }
+    final current = await _read();
+    if (epoch != _epoch) return _restoredPlan();
     _inputs = inputs;
     _configurationInput = configInput;
-    _stored = jsonEncode((await _read())?.toJson());
+    _stored = jsonEncode(current?.toJson());
     return generated;
   }
 
@@ -141,6 +150,22 @@ class TrainingPlanPersistence {
     }
   }
 
+  Future<TrainingPlan> _restoredPlan() async {
+    final epoch = _epoch;
+    final saved = await _read();
+    if (epoch != _epoch) return _restoredPlan();
+    final plan = saved?.plans.firstOrNull;
+    if (plan == null) throw SnapshotRevisionConflict();
+    return plan.plan.toDomain();
+  }
+
+  void resetBaseline() {
+    _epoch++;
+    _inputs = null;
+    _stored = null;
+    _configurationInput = null;
+  }
+
   Future<void> resetCycle(DateTime date) async {
     await service.transformLocalState((snapshot) {
       final timestamp = service.clock().toUtc();
@@ -164,9 +189,7 @@ class TrainingPlanPersistence {
           .decode(state);
       return snapshot;
     });
-    _inputs = null;
-    _stored = null;
-    _configurationInput = null;
+    resetBaseline();
   }
 }
 
@@ -175,6 +198,8 @@ final _persistence = Expando<TrainingPlanPersistence>();
 extension TrainingPlanBackupOperations on SnapshotBackupService {
   TrainingPlanPersistence get _plans =>
       _persistence[this] ??= TrainingPlanPersistence(this);
+
+  void resetTrainingPlanBaseline() => _persistence[this]?.resetBaseline();
 
   Future<TrainingPlan> resolveTrainingPlan({
     required String inputs,

@@ -27,6 +27,7 @@ ActivityRepository activityRepository(Ref ref) {
     localDataSource: ref.read(localActivityDataSourceProvider),
     preferencesStorage: ref.read(preferencesStorageProvider),
     tokenStorage: ref.read(tokenStorageProvider),
+    readLocalOnly: true,
   );
 }
 
@@ -166,20 +167,6 @@ Future<RunningStats?> runningStats(Ref ref) async {
             userThresholdPace: userThresholdPace,
           ),
         );
-
-  final activityMaxHr = target
-      .map((a) => a.maxHeartRate)
-      .whereType<double>()
-      .fold<double?>(
-        null,
-        (max, hr) => max == null ? hr : (hr > max ? hr : max),
-      );
-
-  if (activityMaxHr != null) {
-    await ref
-        .read(hrPreferencesProvider.notifier)
-        .updateFromStrava(activityMaxHr: activityMaxHr.round());
-  }
 
   return stats;
 }

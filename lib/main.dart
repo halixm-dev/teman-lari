@@ -7,6 +7,7 @@ import 'core/utils/responsive.dart';
 import 'data/datasources/preferences_storage.dart';
 import 'data/backup/snapshot_backup_service.dart';
 import 'presentation/widgets/local_recovery_gate.dart';
+import 'presentation/widgets/local_backup_recovery_observer.dart';
 import 'presentation/widgets/tracked_workout_guard.dart';
 import 'domain/entities/training_plan.dart';
 import 'presentation/providers/auth_provider.dart';
@@ -77,7 +78,10 @@ void main() async {
   runApp(
     LocalRecoveryGate(
       initialize: SnapshotBackupService.shared.initialize,
-      ready: () => const ProviderScope(child: TemanLariApp()),
+      recoveryRequired: SnapshotBackupService.shared.coordinator.recoveryState,
+      ready: () => const ProviderScope(
+        child: LocalBackupRecoveryObserver(child: TemanLariApp()),
+      ),
     ),
   );
 }

@@ -28,6 +28,49 @@ void main() {
     await Hive.close();
     await directory.delete(recursive: true);
   });
+  test(
+    'import baseline reset keeps identical saved plan with changed activity inputs',
+    () async {
+      await service.resolveTrainingPlan(
+        inputs: 'before import',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async => detailedPlan(),
+      );
+      service.resetTrainingPlanBaseline();
+      final restored = await service.resolveTrainingPlan(
+        inputs: 'after import adds activity',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async =>
+            throw StateError('Imported plan must stay authoritative'),
+      );
+      check(restored.goal).equals('My saved plan');
+    },
+  );
+  test(
+    'reset after generation commits prevents stale cache publication',
+    () async {
+      service = SnapshotBackupService(
+        coordinator: service.coordinator,
+        onPhase: (phase, _) async {
+          if (phase == SnapshotPhase.committed) {
+            service.resetTrainingPlanBaseline();
+          }
+        },
+      );
+      await service.resolveTrainingPlan(
+        inputs: 'old activity inputs',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async => detailedPlan(),
+      );
+      final preserved = await service.resolveTrainingPlan(
+        inputs: 'restored activity inputs',
+        configuration: TrainingPlanConfig.defaultConfig,
+        generate: (_) async =>
+            throw StateError('Old generation republished its inputs'),
+      );
+      check(preserved.goal).equals('My saved plan');
+    },
+  );
   test('plan storage failure propagates without repeated generation', () async {
     var generations = 0;
     final failing = SnapshotBackupService(

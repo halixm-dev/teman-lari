@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 /// One queue for all local data access, including provider reads and restores.
 class LocalDataCoordinator {
@@ -14,7 +15,10 @@ class LocalDataCoordinator {
   int revision = 0;
   bool snapshotBusy = false;
   bool workoutActive = false;
-  bool recoveryRequired = false;
+  final _recoveryState = ValueNotifier<bool>(false);
+  ValueListenable<bool> get recoveryState => _recoveryState;
+  bool get recoveryRequired => _recoveryState.value;
+  set recoveryRequired(bool value) => _recoveryState.value = value;
 
   bool get _ownsLease {
     final lease = Zone.current[_zoneKey];

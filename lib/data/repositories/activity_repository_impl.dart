@@ -17,12 +17,14 @@ class ActivityRepositoryImpl implements ActivityRepository {
   final LocalActivityDataSource localDataSource;
   final PreferencesStorage preferencesStorage;
   final TokenStorage? tokenStorage;
+  final bool readLocalOnly;
 
   ActivityRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.preferencesStorage,
     this.tokenStorage,
+    this.readLocalOnly = false,
   });
 
   Future<bool> _isAuthenticated() async {
@@ -58,6 +60,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
     final prefs = await preferencesStorage.getPreferences();
     final maxHr = prefs.maxHr ?? 190;
 
+    if (readLocalOnly) {
+      final local = await localDataSource.getAllActivities();
+      return _mapModelsToEntities(local, maxHr: maxHr);
+    }
     final isAuth = await _isAuthenticated();
     if (!isAuth) {
       log(
@@ -132,6 +138,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         monthsBack: monthsBack,
       );
       await localDataSource.smartMergeActivities(remoteActivities);
+      if (readLocalOnly) await _refreshHeartRateStreams();
     } on UnauthenticatedException catch (e, stack) {
       log(
         'Athlete unauthenticated during refresh',
@@ -264,9 +271,27 @@ class ActivityRepositoryImpl implements ActivityRepository {
   }
 
   @override
-  Future<Map<int, List<double>>> getHeartRateStreams(
-    List<int> activityIds,
-  ) async {
+  Future<Map<int, List<double>>> getHeartRateStreams(List<int> activityIds) =>
+      _loadHeartRateStreams(activityIds, allowRemote: !readLocalOnly);
+
+  Future<void> _refreshHeartRateStreams() async {
+    final activities = await _getLocalActivities();
+    activities.sort(
+      (a, b) =>
+          DateTime.parse(b.startDate).compareTo(DateTime.parse(a.startDate)),
+    );
+    final ids = activities
+        .where((activity) => activity.averageHeartrate != null)
+        .take(50)
+        .map((activity) => activity.id)
+        .toList();
+    await _loadHeartRateStreams(ids, allowRemote: true);
+  }
+
+  Future<Map<int, List<double>>> _loadHeartRateStreams(
+    List<int> activityIds, {
+    required bool allowRemote,
+  }) async {
     if (activityIds.isEmpty) return {};
 
     final cached = await localDataSource.getCachedHeartRateStreams(
@@ -277,7 +302,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         .where((id) => !result.containsKey(id))
         .toList();
 
-    if (uncached.isEmpty) return result;
+    if (!allowRemote || uncached.isEmpty) return result;
 
     if (!await _isAuthenticated()) {
       return result;

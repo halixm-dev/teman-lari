@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/responsive.dart';
 import '../providers/core_provider.dart';
 import '../providers/preferences_provider.dart';
+import '../providers/local_backup_refresh.dart';
 import '../theme/app_colors.dart';
 import '../widgets/settings/about_card.dart';
 import '../widgets/settings/backup_card.dart';
@@ -36,6 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _storedAthleteName;
   bool _isSaving = false;
   bool _showSuccess = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -61,8 +63,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final prefs = await ref.read(hrPreferencesProvider.future);
-    final athleteName = await ref.read(athleteNameProvider.future);
+    final generation = ++_loadGeneration;
+    final preferences = ref.read(hrPreferencesProvider.future);
+    final name = ref.read(athleteNameProvider.future);
+    final prefs = await preferences;
+    final athleteName = await name;
+    if (!mounted || generation != _loadGeneration) return;
 
     _restingHrController.removeListener(_onFieldChanged);
     _maxHrController.removeListener(_onFieldChanged);
@@ -208,6 +214,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       });
 
       final prefs = await ref.read(hrPreferencesProvider.future);
+      if (!mounted) return;
       _storedRestingHr = prefs.restingHr;
       _storedMaxHr = prefs.maxHr;
       _storedThresholdPace = prefs.thresholdPaceSeconds;
@@ -307,6 +314,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(localBackupRefreshEpochProvider, (previous, next) {
+      if (previous != next) _load();
+    });
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ConstrainedContent(

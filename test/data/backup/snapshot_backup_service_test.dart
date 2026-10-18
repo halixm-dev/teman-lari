@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'fixtures/recovery_plan.dart';
-import 'dart:async';
+import 'fixtures/interrupted_process.dart';
 
 import 'package:checks/checks.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -234,41 +234,9 @@ void main() {
   );
 }
 
-Future<void> runInterruptedRestore(String path, String phase) async {
-  final root = File(
-    Platform.resolvedExecutable,
-  ).parent.parent.parent.parent.parent.parent.path;
-  final dartName = Platform.isWindows ? 'dart.exe' : 'dart';
-  final process = await Process.start(
-    '$root/bin/cache/dart-sdk/bin/$dartName',
-    [
-      '--packages=$root/packages/flutter_tools/.dart_tool/package_config.json',
-      '$root/bin/cache/flutter_tools.snapshot',
-      'test',
-      '--no-pub',
-      'test/data/backup/fixtures/recovery_worker.dart',
-    ],
-    environment: {
-      'BACKUP_RECOVERY_DIRECTORY': path,
-      'BACKUP_CRASH_PHASE': phase,
-    },
-  );
-  // Drain diagnostics without waiting for inherited Windows pipe handles to
-  // close: the worker's durable phase sentinel proves the injected exit ran.
-  final output = process.stdout.listen((_) {});
-  final errors = process.stderr.listen((_) {});
-  try {
-    final code = await process.exitCode.timeout(
-      const Duration(seconds: 60),
-      onTimeout: () {
-        process.kill();
-        throw TimeoutException('Disposable restore process did not exit.');
-      },
+Future<void> runInterruptedRestore(String path, String phase) =>
+    runInterruptedBackupWorker(
+      worker: 'test/data/backup/fixtures/recovery_worker.dart',
+      directory: path,
+      phase: phase,
     );
-    check(code).not((it) => it.equals(0));
-    check(await File('$path/interrupted_at').readAsString()).equals(phase);
-  } finally {
-    await output.cancel();
-    await errors.cancel();
-  }
-}

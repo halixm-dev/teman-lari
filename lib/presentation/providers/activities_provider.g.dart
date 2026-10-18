@@ -103,7 +103,7 @@ final class ActivityRepositoryProvider
 }
 
 String _$activityRepositoryHash() =>
-    r'0fd827750c1871574182e2ab2b116920d71d8b1e';
+    r'b6513a3d62033695b02e241aac85e240d01fd478';
 
 @ProviderFor(analyzeRunsUseCase)
 final analyzeRunsUseCaseProvider = AnalyzeRunsUseCaseProvider._();
@@ -235,4 +235,4 @@ final class RunningStatsProvider
   }
 }
 
-String _$runningStatsHash() => r'a70ce40fda4e43f1f8ba9c75fc81d02c64244207';
+String _$runningStatsHash() => r'8d3ee767a55426b68c83369a95585e32b6df1ae3';
