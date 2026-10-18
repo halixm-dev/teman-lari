@@ -1,3 +1,4 @@
+import 'interrupted_process.dart' show markBackupWorkerStarted;
 import 'dart:io';
 import 'recovery_plan.dart';
 
@@ -8,6 +9,7 @@ import 'package:teman_lari/data/backup/local_data_coordinator.dart';
 import 'package:teman_lari/data/backup/snapshot_backup_service.dart';
 
 void main() {
+  markBackupWorkerStarted();
   test('disposable restore process', () async {
     final path = Platform.environment['BACKUP_RECOVERY_DIRECTORY'];
     final phase = Platform.environment['BACKUP_CRASH_PHASE'];

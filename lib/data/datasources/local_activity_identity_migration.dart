@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../backup/activity_identity_aliases.dart';
 import '../backup/snapshot_backup_service.dart';
 import '../models/activity_model.dart';
 
@@ -67,8 +68,19 @@ Map<String, Object?> _uploadedRow(Map old, ActivityModel uploaded) {
   ]) {
     if (current.containsKey(key)) updated[key] = current[key];
   }
+  final aliases = {
+    for (final alias in validatedActivityAliases(
+      old['identity_aliases'],
+      owner: current,
+    ))
+      activityAliasKey(alias): alias,
+    if ((current['id'] as int) < 0)
+      activityAliasKey(activityIdentityContext(current)):
+          activityIdentityContext(current),
+  };
   return {
     ...Map<String, Object?>.from(old),
+    if (aliases.isNotEmpty) 'identity_aliases': aliases.values.toList(),
     'id': uploaded.id,
     'data': jsonEncode(updated),
   };

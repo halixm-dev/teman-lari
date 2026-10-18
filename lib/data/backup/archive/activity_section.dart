@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../activity_identity_aliases.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/activity_model.dart';
 import '../snapshot_store.dart';
@@ -43,6 +44,10 @@ class ActivitySectionCodec {
       workoutType: model.workoutType,
       perceivedExertion: model.perceivedExertion,
       isLocal: id < 0,
+      identityAliases: validatedActivityAliases(
+        row['identity_aliases'],
+        owner: data,
+      ),
     );
   }
 

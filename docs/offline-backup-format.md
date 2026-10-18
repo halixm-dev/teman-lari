@@ -133,3 +133,32 @@ non-finite measurements, fractional integer fields, duplicate IDs, count
 mismatches, dangling references, and identities outside the active platform's
 exact range. Unknown optional metadata may be ignored by supported consumers.
 Import starts in Smart Merge mode; replacement remains a separate choice.
+
+
+Smart Merge confirmation binds the selected content to its local revision. A local
+edit produces a fresh preview which needs confirmation again. Schema validation
+is separate from local identity conflicts, so a valid archive remains visible if
+Smart Merge cannot reconcile a local immutable identity.
+
+Activities may include optional `identity_aliases`. Each alias contains only
+`source_id` (an exact negative Activity ID), `type`, `start_date` (UTC instant),
+and `distance_meters` (the exact decimal representation of the original rounded
+finite double distance). Type and start must match the owning Activity. The old
+distance is retained when ordinary edits change measurements. Duplicate contexts
+and contexts claimed by distinct archive owners are invalid. Positive remote IDs
+cannot be aliased together. Aliases survive ordinary saves, upload identity
+migration, reopen, and export; they never contribute to section counts.
+
+Smart Merge keeps local non-null measurements and nonempty heart rate streams,
+fills missing nullable fields and streams, and reports retained conflicts. Mutable
+preferences, equipment, and Feedback require strictly newer edit times; ties and
+unknown times retain local data. The Training Plan, progress, configuration, and
+cycle preferences form one recency unit. Different Activity IDs remain separate
+unless a saved alias proves their identity; signature matching is a later step.
+
+Before live writes, import durably stages complete before/next images. A preparing
+marker identifies incomplete staging which cannot have changed live data. A
+staged transaction rolls back on recovery until its durable commit marker exists.
+Cleanup uncertainty blocks ordinary data access until recovery flushes the journal,
+even if its in-memory cache is empty. Recovery and successful imports reset the
+plan input baseline; provider refresh stays local and preserves authentication.

@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'import_preview.dart';
+import 'import_summary.dart';
+import 'training_plan_persistence.dart';
+import 'snapshot_smart_merge.dart';
 import 'archive/snapshot_archive_validator.dart';
 
 import 'archive/snapshot_archive_codec.dart';
@@ -20,6 +23,7 @@ import 'snapshot_store_adapters.dart';
 
 export 'snapshot_store.dart';
 export 'import_preview.dart';
+export 'import_summary.dart';
 export 'training_plan_persistence.dart' show TrainingPlanBackupOperations;
 
 enum BackupExportPhase { idle, preparing, saving }
@@ -34,11 +38,18 @@ class SnapshotRevisionConflict extends StateError {
     : super('Local data changed. Refresh the import preview.');
 }
 
+class SnapshotImportPreviewStale extends SnapshotRevisionConflict {
+  final BackupImportPreview preview;
+  SnapshotImportPreviewStale(this.preview);
+}
+
 class SnapshotRecoveryException implements Exception {
   final Object cause;
-  SnapshotRecoveryException(this.cause);
+  final Object? originalCause;
+  SnapshotRecoveryException(this.cause, {this.originalCause});
   @override
-  String toString() => 'Local data recovery needs retry: $cause';
+  String toString() =>
+      'Local data recovery needs retry: ${originalCause == null ? '' : 'Initial failure: $originalCause; '}$cause';
 }
 
 /// Strict, local-only boundary used by portable and future cloud snapshots.
@@ -63,6 +74,7 @@ class SnapshotBackupService {
   final exportPhase = ValueNotifier<BackupExportPhase>(BackupExportPhase.idle);
   final importPhase = ValueNotifier<BackupImportPhase>(BackupImportPhase.idle);
   final SnapshotPhaseObserver? onPhase;
+  final Future<Box> Function()? journalFactory;
   final Future<bool> Function(int bytes)? checkAvailableSpace;
   final Map<String, SnapshotStore> _stores = {};
 
@@ -70,6 +82,7 @@ class SnapshotBackupService {
     LocalDataCoordinator? coordinator,
     Iterable<SnapshotStore>? stores,
     this.onPhase,
+    this.journalFactory,
     this.checkAvailableSpace,
     DateTime Function()? clock,
     String Function()? snapshotId,
@@ -103,24 +116,35 @@ class SnapshotBackupService {
     _stores[store.name] = store;
   }
 
-  Future<Box> get _journal async => Hive.isBoxOpen('snapshot_recovery')
-      ? Hive.box('snapshot_recovery')
-      : await Hive.openBox('snapshot_recovery');
+  Future<Box> get _journal async {
+    final factory = journalFactory;
+    if (factory != null) return factory();
+    return Hive.isBoxOpen('snapshot_recovery')
+        ? Hive.box('snapshot_recovery')
+        : await Hive.openBox('snapshot_recovery');
+  }
 
   Future<void> initialize() => coordinator.recover(() async {
     try {
       final journal = await _journal;
       if (journal.isNotEmpty) await _recoverJournal(journal);
+      // A successful clear may have left its durability flush uncertain.
+      await journal.flush();
       for (final store in _stores.values.whereType<PreferenceSnapshotStore>()) {
         await store.restoreMirror();
       }
+      resetTrainingPlanBaseline();
     } catch (error) {
       throw SnapshotRecoveryException(error);
     }
   });
 
   Future<void> _recoverJournal(Box journal) async {
-    if (journal.get('committed') == true || journal.get('settled') == true) {
+    final preparationOnly =
+        journal.get('preparing') == true && journal.get('staged') != true;
+    if (journal.get('committed') == true ||
+        journal.get('settled') == true ||
+        preparationOnly) {
       await _cleanup();
     } else {
       final before = journal.get('before');
@@ -190,6 +214,24 @@ class SnapshotBackupService {
     }
   }
 
+  Future<BackupImportSummary> applyImport(BackupImportPreview preview) =>
+      coordinator.snapshot(() async {
+        importPhase.value = BackupImportPhase.applying;
+        try {
+          final local = await _read();
+          final bytes = Uint8List.fromList(utf8.encode(preview.archiveBinding));
+          if (preview.localRevision != local.revision) {
+            final refreshed = await compute(_decodeImport, (bytes, local));
+            throw SnapshotImportPreviewStale(refreshed);
+          }
+          final plan = await compute(_planImport, (bytes, local));
+          await _applyState(plan.state, preview.localRevision);
+          resetTrainingPlanBaseline();
+          return plan.summary;
+        } finally {
+          importPhase.value = BackupImportPhase.idle;
+        }
+      });
   static String _newSnapshotId() {
     final random = Random.secure();
     return base64Url
@@ -262,12 +304,15 @@ class SnapshotBackupService {
       await journal.put('committed', true);
       await journal.flush();
     } catch (error) {
-      await _rollback(before);
+      try {
+        await _rollback(before);
+      } on SnapshotRecoveryException catch (recovery) {
+        throw SnapshotRecoveryException(recovery.cause, originalCause: error);
+      }
       rethrow;
     }
     if (advanceRevision) coordinator.revision++;
-    await onPhase?.call(SnapshotPhase.committed, null);
-    await _cleanup();
+    await _finishCommit();
   }
 
   void _validateStores(LocalSnapshot state) {
@@ -300,23 +345,47 @@ class SnapshotBackupService {
       throw StateError('Not enough storage space to restore safely.');
     }
     final journal = await _journal;
-    if (journal.isNotEmpty) throw StateError('Recovery must finish first.');
+    if (journal.isNotEmpty) {
+      coordinator.recoveryRequired = true;
+      throw SnapshotRecoveryException(
+        StateError('Recovery must finish first.'),
+      );
+    }
     try {
-      await journal.putAll({
+      await _prepareJournal(journal, {
         'before': previous,
         'next': staged,
         'committed': false,
-        'reservation': Uint8List(reserveBytes * 2),
-      });
-      await journal.flush();
-      await journal.delete('reservation');
-      await journal.compact();
-      await journal.flush();
+      }, reserveBytes);
       await onPhase?.call(SnapshotPhase.staged, null);
-    } catch (_) {
-      await _cleanup();
+    } catch (error) {
+      await _cleanupSafely(originalCause: error);
       rethrow;
     }
+  }
+
+  Future<void> _prepareJournal(
+    Box journal,
+    Map<String, Object?> images,
+    int reserveBytes,
+  ) async {
+    await journal.put('preparing', true);
+    await journal.flush();
+    await journal.putAll({
+      ...images,
+      'reservation': Uint8List(reserveBytes * 2),
+    });
+    await journal.flush();
+    // Live stores are still unchanged. Truncation releases the reservation
+    // without Hive compaction closing and renaming the recovery file.
+    await journal.clear();
+    await journal.flush();
+    await journal.put('preparing', true);
+    await journal.flush();
+    await journal.putAll(images);
+    await journal.flush();
+    await journal.put('staged', true);
+    await journal.flush();
   }
 
   Future<void> _replace(LocalSnapshot state) async {
@@ -344,6 +413,25 @@ class SnapshotBackupService {
     } catch (error) {
       coordinator.recoveryRequired = true;
       throw SnapshotRecoveryException(error);
+    }
+  }
+
+  Future<void> _finishCommit() async {
+    try {
+      await onPhase?.call(SnapshotPhase.committed, null);
+      await _cleanup();
+    } catch (error) {
+      coordinator.recoveryRequired = true;
+      throw SnapshotRecoveryException(error);
+    }
+  }
+
+  Future<void> _cleanupSafely({Object? originalCause}) async {
+    try {
+      await _cleanup();
+    } catch (error) {
+      coordinator.recoveryRequired = true;
+      throw SnapshotRecoveryException(error, originalCause: originalCause);
     }
   }
 
@@ -375,9 +463,23 @@ Future<String> _packagedVersion() async {
   return '${package.version}+${package.buildNumber}';
 }
 
-BackupImportPreview _decodeImport((Uint8List, LocalSnapshot) input) =>
-    BackupImportPreview(
-      archiveJson: validateSnapshotArchive(input.$1),
-      localRevision: input.$2.revision,
-      localCounts: const SnapshotArchiveCodec().counts(input.$2),
-    );
+BackupImportPreview _decodeImport((Uint8List, LocalSnapshot) input) {
+  final archive = validateSnapshotArchive(input.$1);
+  BackupImportSummary summary = const BackupImportSummary();
+  String? mergeError;
+  try {
+    summary = planSmartMerge(archive, input.$2).summary;
+  } on BackupMergeConflict catch (error) {
+    mergeError = error.message;
+  }
+  return BackupImportPreview(
+    archiveJson: archive,
+    localRevision: input.$2.revision,
+    localCounts: const SnapshotArchiveCodec().counts(input.$2),
+    summary: summary,
+    mergeError: mergeError,
+  );
+}
+
+SnapshotMergePlan _planImport((Uint8List, LocalSnapshot) input) =>
+    planSmartMerge(validateSnapshotArchive(input.$1), input.$2);

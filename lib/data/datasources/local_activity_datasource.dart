@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../backup/activity_identity_aliases.dart';
 
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -280,6 +281,11 @@ class LocalActivityDataSource {
     return id.toString();
   }
 
+  Map<String, Object?> _identityMetadata(Object? row) =>
+      row is Map && row.containsKey('identity_aliases')
+      ? {'identity_aliases': validatedActivityAliases(row['identity_aliases'])}
+      : {};
+
   /// Saves a batch of activities additively into Hive.
   Future<void> _saveActivities(List<ActivityModel> activities) async {
     if (activities.isEmpty) return;
@@ -290,6 +296,7 @@ class LocalActivityDataSource {
       for (final input in activities) {
         final activity = await _assignment(input);
         entries[_toKey(activity.id)] = {
+          ..._identityMetadata(box.get(_toKey(activity.id))),
           'id': activity.id,
           'data': jsonEncode(activity.toJson()),
           'synced_at': now,
@@ -310,6 +317,7 @@ class LocalActivityDataSource {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'id': activity.id,
         'data': jsonEncode(activity.toJson()),
         'synced_at': DateTime.now().millisecondsSinceEpoch,
@@ -331,6 +339,7 @@ class LocalActivityDataSource {
           DateTime.now().millisecondsSinceEpoch;
 
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'id': activity.id,
         'data': jsonEncode(activity.toJson()),
         'synced_at': syncedAt,
@@ -357,47 +366,44 @@ class LocalActivityDataSource {
     List<ActivityModel> remoteActivities,
   ) async {
     if (remoteActivities.isEmpty) return;
-    try {
-      final box = await activitiesBox;
-      final Map<dynamic, Map<String, dynamic>> entries = {};
-      final now = DateTime.now().millisecondsSinceEpoch;
-      for (final remote in remoteActivities) {
-        final key = _toKey(remote.id);
-        final existingRaw = box.get(key);
-        ActivityModel merged = remote;
-        int syncedAt = now;
-        if (existingRaw is Map) {
-          try {
-            final existingModel = ActivityModel.fromJson(
-              jsonDecode(existingRaw['data'] as String),
-            );
-            syncedAt = existingRaw['synced_at'] as int? ?? now;
+    final box = await activitiesBox;
+    final Map<dynamic, Map<String, dynamic>> entries = {};
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final remote in remoteActivities) {
+      final key = _toKey(remote.id);
+      final existingRaw = box.get(key);
+      ActivityModel merged = remote;
+      int syncedAt = now;
+      if (existingRaw is Map) {
+        try {
+          final existingModel = ActivityModel.fromJson(
+            jsonDecode(existingRaw['data'] as String),
+          );
+          syncedAt = existingRaw['synced_at'] as int? ?? now;
+          merged = merged.copyWith(
+            shoeId: existingModel.shoeAssignmentModifiedAt != null
+                ? existingModel.shoeId
+                : existingModel.shoeId ?? remote.shoeId,
+            shoeAssignmentModifiedAt: existingModel.shoeAssignmentModifiedAt,
+          );
+          if (remote.perceivedExertion == null &&
+              existingModel.perceivedExertion != null) {
             merged = merged.copyWith(
-              shoeId: existingModel.shoeAssignmentModifiedAt != null
-                  ? existingModel.shoeId
-                  : existingModel.shoeId ?? remote.shoeId,
-              shoeAssignmentModifiedAt: existingModel.shoeAssignmentModifiedAt,
+              perceivedExertion: existingModel.perceivedExertion,
             );
-            if (remote.perceivedExertion == null &&
-                existingModel.perceivedExertion != null) {
-              merged = merged.copyWith(
-                perceivedExertion: existingModel.perceivedExertion,
-              );
-            }
-          } catch (_) {}
-        }
-        await _ensureShoe(merged.shoeId);
-        entries[key] = {
-          'id': merged.id,
-          'data': jsonEncode(merged.toJson()),
-          'synced_at': syncedAt,
-        };
+          }
+        } catch (_) {}
       }
-      if (entries.isNotEmpty) {
-        await box.putAll(entries);
-      }
-    } catch (_) {
-      rethrow;
+      await _ensureShoe(merged.shoeId);
+      entries[key] = {
+        ..._identityMetadata(existingRaw),
+        'id': merged.id,
+        'data': jsonEncode(merged.toJson()),
+        'synced_at': syncedAt,
+      };
+    }
+    if (entries.isNotEmpty) {
+      await box.putAll(entries);
     }
   }
 
@@ -466,6 +472,7 @@ class LocalActivityDataSource {
       final box = await hrStreamsBox;
       final key = _toKey(activityId);
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'activity_id': activityId,
         'data': jsonEncode(data),
         'synced_at': DateTime.now().millisecondsSinceEpoch,

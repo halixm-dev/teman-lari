@@ -1,15 +1,22 @@
 import 'dart:convert';
+import 'import_summary.dart';
 
 import 'archive/snapshot_archive.dart';
 
+class BackupMergeConflict extends FormatException {
+  const BackupMergeConflict(super.message);
+}
+
 enum BackupImportMode { smartMerge, replaceAll }
 
-enum BackupImportPhase { idle, picking, validating }
+enum BackupImportPhase { idle, picking, validating, applying }
 
 /// Retains the exact validated content independently of callers' mutable DTOs.
 class BackupImportPreview {
   final String _archiveJson;
   final int localRevision;
+  final BackupImportSummary summary;
+  final String? mergeError;
   final String snapshotId;
   final DateTime createdAt;
   final int schemaVersion;
@@ -20,6 +27,8 @@ class BackupImportPreview {
   BackupImportPreview({
     required Map<String, dynamic> archiveJson,
     required this.localRevision,
+    this.summary = const BackupImportSummary(),
+    this.mergeError,
     required Map<String, int> localCounts,
   }) : _archiveJson = jsonEncode(archiveJson),
        localCounts = Map.unmodifiable(localCounts),

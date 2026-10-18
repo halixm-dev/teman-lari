@@ -95,12 +95,25 @@ void main() {
     );
     check(group.groupValue).equals(BackupImportMode.smartMerge);
     final disabled = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Import unavailable'),
+      find.widgetWithText(FilledButton, 'Import with Smart Merge'),
     );
-    check(disabled.onPressed).isNull();
+    check(disabled.onPressed).isNotNull();
     check(find.text('Local').evaluate().length).equals(1);
-    check(find.text('Archive').evaluate().length).equals(1);
+    check(find.text('File').evaluate().length).equals(1);
     check(find.text('Activities').evaluate().length).equals(1);
+    check(
+      tester.widget<AlertDialog>(find.byType(AlertDialog)).semanticLabel,
+    ).equals('Backup preview');
+    check(
+      find.text('Times come from each device’s clock.').evaluate().length,
+    ).equals(1);
+    final replacement = tester.widget<RadioListTile<BackupImportMode>>(
+      find.widgetWithText(
+        RadioListTile<BackupImportMode>,
+        'Replace All Local Data',
+      ),
+    );
+    check(replacement.enabled).equals(false);
     check(tester.takeException()).isNull();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();

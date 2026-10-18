@@ -209,78 +209,80 @@ void main() {
   testWidgets(
     'runtime rollback failure hides Settings and preserves login on retry',
     (tester) async {
-      var requests = 0;
-      final tokens = MemoryTokens();
-      final client = MockClient((request) async {
-        requests++;
-        throw StateError('Recovery must stay offline');
-      });
-      await tester.runAsync(
-        () => service.initialize().timeout(const Duration(seconds: 30)),
-      );
-      await tester.pumpWidget(
-        LocalRecoveryGate(
-          initialize: service.initialize,
-          recoveryRequired: service.coordinator.recoveryState,
-          ready: () => ProviderScope(
-            overrides: [
-              snapshotBackupServiceProvider.overrideWithValue(service),
-              preferencesStorageProvider.overrideWithValue(
-                PreferencesStorage(coordinator: service.coordinator),
-              ),
-              tokenStorageProvider.overrideWithValue(tokens),
-              httpClientProvider.overrideWithValue(client),
-            ],
-            child: const MaterialApp(home: SettingsScreen()),
-          ),
-        ),
-      );
-      await tester.runAsync(
-        () async => Future<void>.delayed(const Duration(milliseconds: 30)),
-      );
-      await tester.pumpAndSettle();
-      check(find.byType(SettingsScreen).evaluate().length).equals(1);
-      tokens.value = StravaTokens(
-        accessToken: 'original',
-        refreshToken: 'original-refresh',
-        expiresAt: 1,
-      );
       await tester.runAsync(() async {
+        var requests = 0;
+        final tokens = MemoryTokens();
+        final client = MockClient((request) async {
+          requests++;
+          throw StateError('Recovery must stay offline');
+        });
+        await service.initialize().timeout(const Duration(seconds: 10));
+        await tester.pumpWidget(
+          LocalRecoveryGate(
+            initialize: service.initialize,
+            recoveryRequired: service.coordinator.recoveryState,
+            ready: () => ProviderScope(
+              overrides: [
+                snapshotBackupServiceProvider.overrideWithValue(service),
+                preferencesStorageProvider.overrideWithValue(
+                  PreferencesStorage(coordinator: service.coordinator),
+                ),
+                tokenStorageProvider.overrideWithValue(tokens),
+                httpClientProvider.overrideWithValue(client),
+              ],
+              child: const MaterialApp(home: SettingsScreen()),
+            ),
+          ),
+        );
+        await settleRecovery(tester, service);
+        check(find.byType(SettingsScreen).evaluate().length).equals(1);
+        tokens.value = StravaTokens(
+          accessToken: 'original',
+          refreshToken: 'original-refresh',
+          expiresAt: 1,
+        );
         final next = await service.readLocalState().timeout(
-          const Duration(seconds: 30),
+          const Duration(seconds: 10),
         );
         next.stores['preferences'] = {'athlete_name': 'After'};
         equipment.failures = 2;
         await check(
-          service.applyLocalState(next, expectedRevision: next.revision),
+          service
+              .applyLocalState(next, expectedRevision: next.revision)
+              .timeout(const Duration(seconds: 10)),
         ).throws<SnapshotRecoveryException>();
-      });
-      await tester.pumpAndSettle();
-      check(find.byType(SettingsScreen).evaluate().length).equals(0);
-      check(find.text('Retry recovery').evaluate().length).equals(1);
-      await tester.runAsync(() async {
+        await tester.pumpAndSettle();
+        check(find.byType(SettingsScreen).evaluate().length).equals(0);
+        check(find.text('Retry recovery').evaluate().length).equals(1);
         await tester.tap(find.text('Retry recovery'));
-        await tester.pump();
-        while (service.coordinator.snapshotBusy) {
-          await Future<void>.delayed(const Duration(milliseconds: 10));
-        }
+        await settleRecovery(tester, service);
+        check(find.text('Checking local data recovery…').evaluate()).isEmpty();
+        check(find.byType(SettingsScreen).evaluate().length).equals(1);
+        check(requests).equals(0);
+        check(tokens.saves).equals(0);
+        check(tokens.value.refreshToken).equals('original-refresh');
+        check(
+          (await service.readLocalState())
+              .stores['preferences']?['athlete_name'],
+        ).equals('Before');
       });
-      await tester.pump();
-      await tester.pump();
-      check(
-        find.text('Checking local data recovery…').evaluate().length,
-      ).equals(0);
-      check(find.byType(SettingsScreen).evaluate().length).equals(1);
-      check(requests).equals(0);
-      check(tokens.saves).equals(0);
-      check(tokens.value.refreshToken).equals('original-refresh');
-      check(
-        (await tester.runAsync(
-          service.readLocalState,
-        ))?.stores['preferences']?['athlete_name'],
-      ).equals('Before');
     },
   );
+}
+
+Future<void> settleRecovery(
+  WidgetTester tester,
+  SnapshotBackupService service,
+) async {
+  await tester.pump();
+  final recovery = Stopwatch()..start();
+  while (service.coordinator.snapshotBusy &&
+      recovery.elapsed < const Duration(seconds: 10)) {
+    await tester.pump();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  check(service.coordinator.snapshotBusy).isFalse();
+  await tester.pumpAndSettle();
 }
 
 class RetryStore extends HiveSnapshotStore {

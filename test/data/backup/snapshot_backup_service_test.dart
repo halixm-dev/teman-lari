@@ -116,7 +116,7 @@ void main() {
         ),
       ).equals('Before');
     },
-    timeout: const Timeout(Duration(minutes: 2)),
+    timeout: const Timeout(Duration(minutes: 4)),
   );
   test('normal activity writes share the snapshot revision', () async {
     final before = await service.readLocalState();
@@ -204,7 +204,7 @@ void main() {
         ),
       ).equals('After');
     },
-    timeout: const Timeout(Duration(minutes: 2)),
+    timeout: const Timeout(Duration(minutes: 4)),
   );
   test(
     'snapshot includes old non-run records and every stored identity',

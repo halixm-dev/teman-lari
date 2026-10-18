@@ -10,27 +10,7 @@ Future<void> runInterruptedBackupWorker({
   required String phase,
   Map<String, String> environment = const {},
 }) async {
-  final sdk = File(
-    Platform.resolvedExecutable,
-  ).parent.parent.parent.parent.parent.parent.path;
-  final dart = Platform.isWindows ? 'dart.exe' : 'dart';
-  final process = await Process.start(
-    '$sdk/bin/cache/dart-sdk/bin/$dart',
-    [
-      '--packages=$sdk/packages/flutter_tools/.dart_tool/package_config.json',
-      '$sdk/bin/cache/flutter_tools.snapshot',
-      '--no-version-check',
-      '--suppress-analytics',
-      'test',
-      '--no-pub',
-      worker,
-    ],
-    environment: {
-      ...environment,
-      'BACKUP_RECOVERY_DIRECTORY': directory,
-      'BACKUP_CRASH_PHASE': phase,
-    },
-  );
+  final process = await _startWorker(worker, directory, phase, environment);
   var exited = false;
   final exitCode = process.exitCode.then((code) {
     exited = true;
@@ -57,21 +37,73 @@ Future<void> runInterruptedBackupWorker({
   }
 }
 
+Future<Process> _startWorker(
+  String worker,
+  String directory,
+  String phase,
+  Map<String, String> environment,
+) async {
+  for (final name in ['worker_started', 'interrupted_at']) {
+    final marker = File('$directory/$name');
+    if (await marker.exists()) await marker.delete();
+  }
+  final sdk = File(
+    Platform.resolvedExecutable,
+  ).parent.parent.parent.parent.parent.parent.path;
+  final dart = Platform.isWindows ? 'dart.exe' : 'dart';
+  return Process.start(
+    '$sdk/bin/cache/dart-sdk/bin/$dart',
+    [
+      '--packages=$sdk/packages/flutter_tools/.dart_tool/package_config.json',
+      '$sdk/bin/cache/flutter_tools.snapshot',
+      '--no-version-check',
+      '--suppress-analytics',
+      'test',
+      '--no-pub',
+      '--no-test-assets',
+      worker,
+    ],
+    environment: {
+      ...environment,
+      'BACKUP_RECOVERY_DIRECTORY': directory,
+      'BACKUP_CRASH_PHASE': phase,
+    },
+  );
+}
+
+void markBackupWorkerStarted() {
+  final directory = Platform.environment['BACKUP_RECOVERY_DIRECTORY'];
+  if (directory != null) {
+    File('$directory/worker_started').writeAsStringSync('started', flush: true);
+  }
+}
+
 Future<void> _waitForCrash(
   Future<int> exitCode,
   File sentinel,
   String phase,
   String Function() diagnostics,
 ) async {
-  final elapsed = Stopwatch()..start();
-  while (elapsed.elapsed < const Duration(seconds: 60)) {
+  final startup = Stopwatch()..start();
+  final started = File('${sentinel.parent.path}/worker_started');
+  Stopwatch? execution;
+  while (true) {
     if (await sentinel.exists() && await sentinel.readAsString() == phase) {
       await exitCode.timeout(const Duration(seconds: 2), onTimeout: () => -1);
       return;
     }
+    if (await started.exists()) {
+      execution ??= Stopwatch()..start();
+      if (execution.elapsed >= const Duration(seconds: 60)) {
+        throw TimeoutException(
+          'Worker started but did not reach $phase. ${diagnostics()}',
+        );
+      }
+    } else if (startup.elapsed >= const Duration(minutes: 2)) {
+      throw TimeoutException('Worker did not start. ${diagnostics()}');
+    }
     await Future<void>.delayed(const Duration(milliseconds: 50));
   }
-  throw TimeoutException('Worker did not reach $phase. ${diagnostics()}');
 }
 
 Future<void> _reap(Process process) async {

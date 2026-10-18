@@ -1,9 +1,11 @@
+import '../activity_identity_aliases.dart';
 import 'snapshot_validation_values.dart';
 import 'snapshot_validation_plan.dart';
 
 void validateArchiveSections(Map<String, dynamic> data) {
   _profile(data['profile']);
   archiveList(_activity)(data['activities']);
+  validateArchiveAliasOwnership(data['activities'] as List);
   archiveList(_stream)(data['heart_rate_streams']);
   validateArchivePlan(data['training_plan_state']);
   archiveShape(data['equipment'], {
@@ -45,6 +47,12 @@ void _activity(Object? value) {
     'perceived_exertion': archiveNullable(archiveNumber),
     'is_local': archiveBool,
   });
+  if (row.containsKey('identity_aliases')) {
+    if (row['identity_aliases'] == null) {
+      throw FormatException('Invalid Activity aliases.');
+    }
+    validatedActivityAliases(row['identity_aliases'], owner: row);
+  }
   if (row['is_local'] != (BigInt.parse(row['id'] as String) < BigInt.zero)) {
     throw FormatException('Activity local marker disagrees with identity.');
   }

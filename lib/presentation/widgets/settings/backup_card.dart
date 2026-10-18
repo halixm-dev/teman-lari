@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/backup/snapshot_backup_service.dart';
 import '../../../data/backup/transport/backup_file_transport.dart';
 import '../../providers/backup_provider.dart';
+import '../../providers/local_backup_refresh.dart';
 import 'backup_import_preview_dialog.dart';
 
 class BackupCard extends ConsumerStatefulWidget {
@@ -15,6 +16,8 @@ class BackupCard extends ConsumerStatefulWidget {
 class _BackupCardState extends ConsumerState<BackupCard> {
   bool _busy = false;
   String? _message;
+  BackupImportSummary? _summary;
+  bool _previewOpen = false;
 
   Future<void> _export() async {
     if (_busy) return;
@@ -50,9 +53,11 @@ class _BackupCardState extends ConsumerState<BackupCard> {
 
   Future<void> _import() async {
     if (_busy) return;
+    var chooseAgain = false;
     setState(() {
       _busy = true;
       _message = null;
+      _summary = null;
     });
     try {
       final preview = await ref
@@ -64,18 +69,45 @@ class _BackupCardState extends ConsumerState<BackupCard> {
           () => _message = 'Import cancelled. Local data was not changed.',
         );
       } else {
-        setState(() => _busy = false);
-        await showDialog<void>(
-          context: context,
-          builder: (_) => BackupImportPreviewDialog(preview: preview),
-        );
-        if (mounted) setState(() => _message = 'Local data was not changed.');
+        chooseAgain = await _showPreview(preview);
       }
     } catch (error) {
-      if (mounted) setState(() => _message = 'Import failed: $error');
+      if (mounted) {
+        setState(() => _message = 'Import failed: ${backupImportError(error)}');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+    if (chooseAgain && mounted) await _import();
+  }
+
+  Future<bool> _showPreview(BackupImportPreview preview) async {
+    var chooseAgain = false;
+    setState(() => _previewOpen = true);
+    final apply = ref.read(snapshotBackupServiceProvider).applyImport;
+    final summary = await showDialog<BackupImportSummary>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BackupImportPreviewDialog(
+        preview: preview,
+        onApply: apply,
+        onChooseFile: () => chooseAgain = true,
+      ),
+    );
+    if (!mounted) return false;
+    setState(() => _previewOpen = false);
+    if (summary != null) {
+      refreshLocalBackupProviders(ref);
+      setState(() {
+        _summary = summary;
+        _message = 'Smart Merge complete.';
+      });
+    } else if (!chooseAgain) {
+      setState(
+        () => _message = 'Import cancelled. Local data was not changed.',
+      );
+    }
+    return chooseAgain;
   }
 
   @override
@@ -100,6 +132,10 @@ class _BackupCardState extends ConsumerState<BackupCard> {
             const _BackupCounts(),
             const SizedBox(height: 16),
             _operationControls(service),
+            if (_summary case final summary?) ...[
+              const SizedBox(height: 12),
+              BackupImportSummaryView(summary: summary),
+            ],
             if (_message case final message?) ...[
               const SizedBox(height: 12),
               Semantics(liveRegion: true, child: Text(message)),
@@ -139,7 +175,7 @@ class _BackupCardState extends ConsumerState<BackupCard> {
           icon: const Icon(Icons.file_upload_outlined),
           label: const Text('Import Backup'),
         ),
-        if (busy) ...[
+        if (busy && !_previewOpen) ...[
           const SizedBox(height: 12),
           const LinearProgressIndicator(semanticsLabel: 'Backup in progress'),
           const SizedBox(height: 8),
@@ -148,6 +184,7 @@ class _BackupCardState extends ConsumerState<BackupCard> {
             child: Text(switch (importing) {
               BackupImportPhase.picking => 'Choose a backup file…',
               BackupImportPhase.validating => 'Checking your backup…',
+              BackupImportPhase.applying => 'Importing your backup…',
               BackupImportPhase.idle =>
                 phase == BackupExportPhase.saving
                     ? 'Choose where to save your backup…'

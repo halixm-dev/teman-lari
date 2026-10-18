@@ -70,6 +70,7 @@ class ArchiveActivity {
   final int? workoutType;
   final double? perceivedExertion;
   final bool isLocal;
+  final List<Map<String, dynamic>> identityAliases;
   const ArchiveActivity({
     required this.id,
     required this.name,
@@ -89,6 +90,7 @@ class ArchiveActivity {
     this.workoutType,
     this.perceivedExertion,
     required this.isLocal,
+    this.identityAliases = const [],
   });
   factory ArchiveActivity.fromJson(Map<String, dynamic> json) =>
       _$ArchiveActivityFromJson(json);

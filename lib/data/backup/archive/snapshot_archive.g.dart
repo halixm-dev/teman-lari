@@ -83,6 +83,11 @@ ArchiveActivity _$ArchiveActivityFromJson(Map<String, dynamic> json) =>
       workoutType: (json['workout_type'] as num?)?.toInt(),
       perceivedExertion: (json['perceived_exertion'] as num?)?.toDouble(),
       isLocal: json['is_local'] as bool,
+      identityAliases:
+          (json['identity_aliases'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$ArchiveActivityToJson(ArchiveActivity instance) =>
@@ -105,6 +110,7 @@ Map<String, dynamic> _$ArchiveActivityToJson(ArchiveActivity instance) =>
       'workout_type': instance.workoutType,
       'perceived_exertion': instance.perceivedExertion,
       'is_local': instance.isLocal,
+      'identity_aliases': instance.identityAliases,
     };
 
 ArchiveHeartRateStream _$ArchiveHeartRateStreamFromJson(
