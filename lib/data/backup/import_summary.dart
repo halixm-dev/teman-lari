@@ -2,6 +2,9 @@
 class BackupImportSummary {
   final int addedActivities;
   final int matchedActivities;
+  final int signatureMatches;
+  final int canonicalIdentityChanges;
+  final int ambiguousSignatures;
   final int retainedConflicts;
   final int changedPreferences;
   final bool changedTrainingPlan;
@@ -14,6 +17,9 @@ class BackupImportSummary {
   const BackupImportSummary({
     this.addedActivities = 0,
     this.matchedActivities = 0,
+    this.signatureMatches = 0,
+    this.canonicalIdentityChanges = 0,
+    this.ambiguousSignatures = 0,
     this.retainedConflicts = 0,
     this.changedPreferences = 0,
     this.addedShoes = 0,

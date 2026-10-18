@@ -29,7 +29,8 @@ void main() {
     );
     await service.initialize();
     final bytes = await File(
-      'test/fixtures/offline-backup-v1-populated.tlbackup',
+      Platform.environment['BACKUP_ARCHIVE_PATH'] ??
+          'test/fixtures/offline-backup-v1-populated.tlbackup',
     ).readAsBytes();
     final preview = await service.prepareImport(Uint8List.fromList(bytes));
     await service.applyImport(preview);

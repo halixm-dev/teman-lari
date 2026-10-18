@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../data/backup/fixtures/linked_record_fixtures.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -31,7 +32,11 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  Future<void> showCard(WidgetTester tester, {double scale = 1}) async {
+  Future<void> showCard(
+    WidgetTester tester, {
+    double scale = 1,
+    Brightness brightness = Brightness.light,
+  }) async {
     await tester.runAsync(service.readBackupCounts);
     await tester.pumpWidget(
       ProviderScope(
@@ -40,6 +45,7 @@ void main() {
           backupFileTransportProvider.overrideWithValue(transport),
         ],
         child: MaterialApp(
+          theme: ThemeData(brightness: brightness),
           home: MediaQuery(
             data: MediaQueryData(textScaler: TextScaler.linear(scale)),
             child: const Scaffold(
@@ -59,6 +65,47 @@ void main() {
       }
     });
     await tester.pumpAndSettle();
+  }
+
+  for (final brightness in Brightness.values) {
+    testWidgets(
+      'signature outcomes appear before and after import in $brightness',
+      (tester) async {
+        await tester.runAsync(() async {
+          await seed(service, [activity('-1', '2025-01-01T00:00:00Z')]);
+          transport.bytes = await archiveBytes([
+            activity('100', '2025-01-01T00:00:00Z'),
+          ]);
+        });
+        await showCard(tester, scale: 2, brightness: brightness);
+        await importAndSettle(tester);
+        for (final text in [
+          'Workouts matched by details: 1',
+          'Workout IDs updated: 1',
+          'Uncertain groups kept separate: 0',
+        ]) {
+          check(find.text(text).evaluate().length).equals(1);
+        }
+        check(
+          find
+              .text('Activities with different IDs are kept separately.')
+              .evaluate(),
+        ).isEmpty();
+        await tester.runAsync(() async {
+          await tester.tap(find.text('Import with Smart Merge'));
+          while (service.coordinator.snapshotBusy) {
+            await Future<void>.delayed(const Duration(milliseconds: 10));
+          }
+        });
+        await tester.pumpAndSettle();
+        check(find.text('Backup preview').evaluate()).isEmpty();
+        check(
+          find.text('Workouts matched by details: 1').evaluate().length,
+        ).equals(1);
+        check(find.text('Workout IDs updated: 1').evaluate().length).equals(1);
+        check(tester.takeException()).isNull();
+      },
+    );
   }
 
   testWidgets('picker cancellation leaves data unchanged', (tester) async {

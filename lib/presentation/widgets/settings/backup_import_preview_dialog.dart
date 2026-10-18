@@ -100,7 +100,6 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
       _SectionCounts(preview: _preview),
       const SizedBox(height: 16),
       _modes(),
-      const Text('Activities with different IDs are kept separately.'),
       const SizedBox(height: 12),
       BackupImportSummaryView(summary: _preview.summary),
       if (_preview.mergeError case final message?) _notice(message),
@@ -160,7 +159,10 @@ class BackupImportSummaryView extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text('Activities added: ${summary.addedActivities}'),
-      Text('Activities matched by ID: ${summary.matchedActivities}'),
+      Text('Activities matched: ${summary.matchedActivities}'),
+      Text('Workouts matched by details: ${summary.signatureMatches}'),
+      Text('Workout IDs updated: ${summary.canonicalIdentityChanges}'),
+      Text('Uncertain groups kept separate: ${summary.ambiguousSignatures}'),
       Text('Local values kept: ${summary.retainedConflicts}'),
       Text('Profile fields changed: ${summary.changedPreferences}'),
       Text(

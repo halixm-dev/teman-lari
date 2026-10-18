@@ -102,3 +102,50 @@ Map<String, dynamic> shoe(
   'created_at': created,
   'modified_at': modified,
 };
+
+Future<Uint8List> linkedArchive(
+  String owner,
+  String shoeId,
+  String feedbackId,
+) => archiveBytes(
+  [activity(owner, '2025-01-01T00:00:00Z')],
+  change: (archive) {
+    final data = archive['data'] as Map;
+    data['heart_rate_streams'] = [
+      {
+        'activity_id': owner,
+        'samples': [150.0],
+      },
+    ];
+    data['equipment'] = {
+      'shoes': [shoe(shoeId, shoeId)],
+      'activity_assignments': [
+        {
+          'activity_id': owner,
+          'shoe_id': shoeId,
+          'modified_at': '2025-02-01T00:00:00Z',
+        },
+      ],
+    };
+    data['rehab_feedback'] = {
+      'records': [
+        {
+          'id': feedbackId,
+          'activity_id': owner,
+          'injury_site': 'knee',
+          'post_run_pain': 2.5,
+          'post_run_recorded_at': '2025-01-01T01:00:00Z',
+          'morning_after_pain': null,
+          'morning_stiffness': null,
+          'morning_after_recorded_at': null,
+          'modified_at': '2025-02-01T00:00:00Z',
+        },
+      ],
+    };
+    (archive['counts'] as Map<String, dynamic>).addAll({
+      'heart_rate_streams': 1,
+      'equipment': 2,
+      'rehab_feedback': 1,
+    });
+  },
+);

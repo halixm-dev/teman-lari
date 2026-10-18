@@ -87,6 +87,7 @@ class MergeActivityIdentities {
   final Map<String, Object?> activities;
   final Set<String> reserved;
   final Map<String, Set<String>> _contexts = {};
+  final Map<String, Set<String>> _ownedContexts = {};
   int _available = -1;
   MergeActivityIdentities(this.activities, Iterable<String> incoming)
     : reserved = {...activities.keys, ...incoming} {
@@ -102,8 +103,40 @@ class MergeActivityIdentities {
       ...validatedActivityAliases(row['identity_aliases'], owner: model),
     ];
     for (final context in contexts) {
-      (_contexts[activityAliasKey(context)] ??= {}).add(id);
+      final key = activityAliasKey(context);
+      (_contexts[key] ??= {}).add(id);
+      (_ownedContexts[id] ??= {}).add(key);
     }
+  }
+
+  String? aliasIdentity(Map<String, dynamic> incoming) {
+    final candidates = <String>{};
+    for (final alias in validatedActivityAliases(
+      incoming['identity_aliases'],
+      owner: incoming,
+    )) {
+      candidates.addAll(_contexts[activityAliasKey(alias)] ?? {});
+    }
+    if (candidates.length > 1) {
+      throw const BackupMergeConflict(
+        'Saved workout identities are ambiguous.',
+      );
+    }
+    if (candidates.isEmpty) return null;
+    final destination = activities[candidates.single];
+    if (destination is Map) _compatible(destination, incoming, false);
+    return candidates.single;
+  }
+
+  void rekeyContexts(String from, String to) {
+    final keys = _ownedContexts.remove(from) ?? {};
+    for (final key in keys) {
+      final owners = _contexts[key];
+      owners?.remove(from);
+      owners?.add(to);
+    }
+    (_ownedContexts[to] ??= {}).addAll(keys);
+    reserved.add(to);
   }
 
   String resolve(Map<String, dynamic> incoming) {

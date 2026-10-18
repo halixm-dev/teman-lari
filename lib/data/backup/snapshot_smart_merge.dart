@@ -7,6 +7,7 @@ import 'import_summary.dart';
 import 'import_preview.dart';
 import 'snapshot_store.dart';
 import 'snapshot_record_merge.dart';
+import 'snapshot_activity_signatures.dart';
 import 'snapshot_state_merge.dart';
 
 class SnapshotMergePlan {
@@ -31,16 +32,9 @@ class _MergePlanner {
     : next = LocalSnapshot.decode(local.encode(), revision: local.revision);
 
   SnapshotMergePlan plan(Map data) {
-    final inputs =
-        List<Map<String, dynamic>>.from(
-          (data['activities'] as List).map(
-            (row) => Map<String, dynamic>.from(row as Map),
-          ),
-        )..sort(
-          (a, b) => BigInt.parse(
-            a['id'] as String,
-          ).compareTo(BigInt.parse(b['id'] as String)),
-        );
+    final inputs = _orderedActivities(data['activities'] as List);
+    final signatures = reconcileActivitySignatures(next, inputs);
+    remapped.addAll(signatures.targets);
     identities = MergeActivityIdentities(
       next.stores['activities'] ?? {},
       inputs.map((row) => row['id'] as String),
@@ -64,6 +58,9 @@ class _MergePlanner {
       BackupImportSummary(
         addedActivities: added,
         matchedActivities: matched,
+        signatureMatches: signatures.matches,
+        canonicalIdentityChanges: signatures.canonicalChanges,
+        ambiguousSignatures: signatures.ambiguities,
         retainedConflicts: conflicts,
         addedShoes: records.addedShoes,
         updatedShoes: records.updatedShoes,
@@ -72,12 +69,22 @@ class _MergePlanner {
         changedAssignments: records.changedAssignments,
         changedPreferences: profile.$1,
         changedTrainingPlan: training.$1,
-        warnings: const [
-          'Known Activity IDs and saved aliases are matched. Activities with other IDs are kept separately.',
+        warnings: [
+          if (signatures.ambiguities > 0)
+            'Some workout details are ambiguous. Those activities were kept separate.',
         ],
       ),
     );
   }
+
+  List<Map<String, dynamic>> _orderedActivities(List activities) =>
+      List<Map<String, dynamic>>.from(
+        activities.map((row) => Map<String, dynamic>.from(row as Map)),
+      )..sort(
+        (a, b) => BigInt.parse(
+          a['id'] as String,
+        ).compareTo(BigInt.parse(b['id'] as String)),
+      );
 
   void _validateAliasOwners() {
     final rows = next.stores['activities'] ?? {};
@@ -98,7 +105,7 @@ class _MergePlanner {
   void _activity(Map<String, dynamic> input) {
     final activities = next.stores['activities'] ?? <String, Object?>{};
     final original = input['id'] as String;
-    final id = identities.resolve(input);
+    final id = remapped[original] ?? identities.resolve(input);
     remapped[original] = id;
     final row = activities[id];
     if (row is Map) {
