@@ -24,8 +24,14 @@ class AnalyzeRunsUseCase {
     int? userRestingHr,
     Duration? userThresholdPace,
     TrainingPlanConfig? config,
+    ReturnContext? returnContextOverride,
   }) {
-    if (activities.isEmpty) return RunningStats.empty();
+    if (activities.isEmpty) {
+      final empty = RunningStats.empty();
+      return returnContextOverride == null
+          ? empty
+          : empty.withReturnContext(returnContextOverride);
+    }
 
     final runningActivities = activities
         .where((a) => a.type == ActivityType.run)
@@ -54,7 +60,8 @@ class AnalyzeRunsUseCase {
 
     final cfg = config ?? TrainingPlanConfig.defaultConfig;
 
-    final returnCtx = _returnDetector.detect(sortedRunning, cfg);
+    final returnCtx =
+        returnContextOverride ?? _returnDetector.detect(sortedRunning, cfg);
 
     final thresholdPace =
         userThresholdPace?.inSeconds ??

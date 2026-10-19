@@ -1,4 +1,5 @@
 import '../entities/return_context.dart';
+import '../entities/rehab_progress.dart';
 import '../entities/activity.dart';
 import '../entities/running_stats.dart';
 import '../entities/training_plan.dart';
@@ -37,8 +38,13 @@ class GeneratePlanUseCase {
     int? userMaxHr,
     int? userRestingHr,
     int? userThresholdPaceSeconds,
+    RehabProgress? rehabilitation,
+    DateTime? rehabilitationGraduatedAt,
+    DateTime? now,
   }) {
-    if (activities.isEmpty) return TrainingPlan.empty();
+    if (activities.isEmpty && rehabilitation == null) {
+      return TrainingPlan.empty();
+    }
 
     final stats = _analyzeRuns.compute(
       activities,
@@ -48,6 +54,11 @@ class GeneratePlanUseCase {
           ? Duration(seconds: userThresholdPaceSeconds)
           : null,
       config: config,
+      returnContextOverride: _rehabContext(
+        rehabilitation,
+        rehabilitationGraduatedAt,
+        now ?? DateTime.now(),
+      ),
     );
     final thresholdPace =
         userThresholdPaceSeconds ??
@@ -119,7 +130,7 @@ class GeneratePlanUseCase {
       }
     }
 
-    final startDate = _startDate(activities);
+    final startDate = _startDate(activities, now ?? DateTime.now());
 
     final sortedActivities = [...activities]
       ..sort((a, b) => b.date.compareTo(a.date));
@@ -153,8 +164,27 @@ class GeneratePlanUseCase {
     );
   }
 
-  DateTime _startDate(List<Activity> activities) {
-    final today = DateTime.now();
+  ReturnContext? _rehabContext(
+    RehabProgress? progress,
+    DateTime? graduated,
+    DateTime now,
+  ) {
+    if (progress != null) {
+      return ReturnContext(
+        gapDays: 0,
+        category: GapCategory.injury,
+        rehabilitation: progress,
+      );
+    }
+    // Confirmation ends this episode; a later inactivity gap can still trigger a return plan.
+    if (graduated != null &&
+        now.difference(graduated).inDays < config.shortGapDays) {
+      return ReturnContext.empty();
+    }
+    return null;
+  }
+
+  DateTime _startDate(List<Activity> activities, DateTime today) {
     final hasRunToday = activities.any(
       (a) =>
           a.date.year == today.year &&

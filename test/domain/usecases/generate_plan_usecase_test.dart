@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:checks/checks.dart';
 import 'package:teman_lari/domain/entities/activity.dart';
 import 'package:teman_lari/domain/entities/running_stats.dart';
+import 'package:teman_lari/domain/entities/return_context.dart';
 import 'package:teman_lari/domain/entities/training_plan.dart';
 import 'package:teman_lari/domain/usecases/analyze_runs_usecase.dart';
 import 'package:teman_lari/domain/usecases/generate_plan_usecase.dart';
@@ -47,8 +48,10 @@ class _MockAnalyzeRuns extends AnalyzeRunsUseCase {
     int? userRestingHr,
     Duration? userThresholdPace,
     TrainingPlanConfig? config,
+    ReturnContext? returnContextOverride,
   }) {
-    return stats ?? super.compute(activities);
+    return stats ??
+        super.compute(activities, returnContextOverride: returnContextOverride);
   }
 }
 

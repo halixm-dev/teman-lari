@@ -4,6 +4,8 @@ part 'rehab_feedback.g.dart';
 
 enum InjurySite { achilles, knee, shin, plantarFascia, hamstring }
 
+enum RehabStatus { pending, pass, warning, flareUp }
+
 /// One Activity and Injury Site identify a dual-window check-in permanently.
 @JsonSerializable(fieldRename: FieldRename.snake)
 class RehabFeedback {
@@ -12,10 +14,14 @@ class RehabFeedback {
   final int activityId;
   final InjurySite injurySite;
   final double? postRunPain;
+  @JsonKey(includeIfNull: false)
+  final bool? acuteSharpPain;
   @JsonKey(fromJson: feedbackInstant, toJson: feedbackInstantJson)
   final DateTime? postRunRecordedAt;
   final double? morningAfterPain;
   final bool? morningStiffness;
+  @JsonKey(includeIfNull: false)
+  final bool? morningBaselineCleared;
   @JsonKey(fromJson: feedbackInstant, toJson: feedbackInstantJson)
   final DateTime? morningAfterRecordedAt;
   @JsonKey(fromJson: feedbackInstant, toJson: feedbackInstantJson)
@@ -26,9 +32,11 @@ class RehabFeedback {
     required this.activityId,
     required this.injurySite,
     this.postRunPain,
+    this.acuteSharpPain,
     this.postRunRecordedAt,
     this.morningAfterPain,
     this.morningStiffness,
+    this.morningBaselineCleared,
     this.morningAfterRecordedAt,
     this.modifiedAt,
   });
@@ -55,7 +63,9 @@ class RehabFeedback {
     }
     if (post != (postRunRecordedAt != null) ||
         morning != (morningAfterRecordedAt != null) ||
-        (!morning && morningStiffness != null)) {
+        (!post && acuteSharpPain != null) ||
+        (!morning &&
+            (morningStiffness != null || morningBaselineCleared != null))) {
       throw FormatException(
         'Feedback windows require matching recording times.',
       );
@@ -84,9 +94,11 @@ class RehabFeedback {
     activityId: activityId,
     injurySite: injurySite,
     postRunPain: postRunPain,
+    acuteSharpPain: acuteSharpPain,
     postRunRecordedAt: postRunRecordedAt,
     morningAfterPain: morningAfterPain,
     morningStiffness: morningStiffness,
+    morningBaselineCleared: morningBaselineCleared,
     morningAfterRecordedAt: morningAfterRecordedAt,
     modifiedAt: instant.toUtc(),
   );

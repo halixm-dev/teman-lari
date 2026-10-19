@@ -35,6 +35,7 @@ class TrainingPlanPersistence {
     required String inputs,
     required TrainingPlanConfig configuration,
     required Future<TrainingPlan> Function(TrainingPlanConfig) generate,
+    bool requireFreshInputs = false,
   }) async {
     if (!service.coordinator.initialized) return generate(configuration);
     final epoch = _epoch;
@@ -46,7 +47,9 @@ class TrainingPlanPersistence {
       TrainingPlanConfigArchive.fromDomain(configuration).toJson(),
     );
     if (plan != null &&
-        (_inputs == null || _stored != stored || _inputs == inputs)) {
+        (requireFreshInputs
+            ? _inputs == inputs && _stored == stored
+            : _inputs == null || _stored != stored || _inputs == inputs)) {
       _inputs = inputs;
       _configurationInput = configInput;
       _stored = stored;
@@ -59,6 +62,7 @@ class TrainingPlanPersistence {
       saved,
       configInput,
       epoch,
+      requireFreshInputs,
     );
   }
 
@@ -69,6 +73,7 @@ class TrainingPlanPersistence {
     TrainingPlanArchive? saved,
     String configInput,
     int epoch,
+    bool requireFreshInputs,
   ) async {
     final revision = service.coordinator.revision;
     final effectiveConfig =
@@ -82,6 +87,7 @@ class TrainingPlanPersistence {
         inputs: inputs,
         configuration: configuration,
         generate: generate,
+        requireFreshInputs: requireFreshInputs,
       );
     }
     try {
@@ -92,6 +98,7 @@ class TrainingPlanPersistence {
         inputs: inputs,
         configuration: configuration,
         generate: generate,
+        requireFreshInputs: requireFreshInputs,
       );
     }
     final current = await _read();
@@ -113,6 +120,9 @@ class TrainingPlanPersistence {
       _initializeCycle(prefs, plan, timestamp);
       snapshot.stores['preferences'] = prefs;
       final state = TrainingPlanArchive(
+        rehabilitation: const TrainingPlanSectionCodec()
+            .encode(snapshot)
+            .rehabilitation,
         plans: [
           TrainingPlanArchiveRecord(
             id: 'active',
@@ -170,6 +180,9 @@ class TrainingPlanPersistence {
     await service.transformLocalState((snapshot) {
       final timestamp = service.clock().toUtc();
       final state = TrainingPlanArchive(
+        rehabilitation: const TrainingPlanSectionCodec()
+            .encode(snapshot)
+            .rehabilitation,
         plans: [],
         activePlanId: null,
         configuration: const TrainingPlanSectionCodec()
@@ -205,10 +218,12 @@ extension TrainingPlanBackupOperations on SnapshotBackupService {
     required String inputs,
     required TrainingPlanConfig configuration,
     required Future<TrainingPlan> Function(TrainingPlanConfig) generate,
+    bool requireFreshInputs = false,
   }) => _plans.resolve(
     inputs: inputs,
     configuration: configuration,
     generate: generate,
+    requireFreshInputs: requireFreshInputs,
   );
 
   Future<void> resetTrainingCycle(DateTime date) async {

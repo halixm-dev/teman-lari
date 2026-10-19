@@ -6,6 +6,7 @@ import 'backup_provider.dart';
 import 'equipment_provider.dart';
 import 'preferences_provider.dart';
 import 'training_plan_provider.dart';
+import 'rehab_provider.dart';
 
 part 'local_backup_refresh.g.dart';
 
@@ -25,6 +26,8 @@ void refreshLocalBackupProviders(WidgetRef ref) {
   ref.invalidate(cycleStartDateProvider);
   ref.invalidate(weekInCycleProvider);
   ref.invalidate(trainingPlanProvider);
+  ref.invalidate(rehabJournalProvider);
+  ref.invalidate(rehabProgressProvider);
   ref.invalidate(runningStatsProvider);
   ref.invalidate(equipmentProvider);
   ref.invalidate(backupCountsProvider);

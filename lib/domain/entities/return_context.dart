@@ -1,3 +1,5 @@
+import 'rehab_progress.dart';
+
 enum GapCategory { none, short, long, injury, extended }
 
 class ReturnContext {
@@ -7,6 +9,7 @@ class ReturnContext {
   final double preGapAvgMin;
   final DateTime? lastActivityDate;
   final bool isStale;
+  final RehabProgress? rehabilitation;
 
   const ReturnContext({
     required this.gapDays,
@@ -15,6 +18,7 @@ class ReturnContext {
     this.preGapAvgMin = 0,
     this.lastActivityDate,
     this.isStale = false,
+    this.rehabilitation,
   });
 
   bool get isReturning => category != GapCategory.none;

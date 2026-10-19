@@ -2,6 +2,8 @@ import 'dart:convert';
 import '../../data/backup/snapshot_backup_service.dart';
 import '../../data/backup/archive/training_plan_config_archive.dart';
 import '../../domain/entities/activity.dart';
+import '../../domain/entities/rehab_progress.dart';
+import 'rehab_provider.dart';
 import 'backup_provider.dart';
 
 import 'package:flutter/foundation.dart';
@@ -51,6 +53,10 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
   final config = ref.watch(trainingPlanConfigProvider);
   final base = ref.read(generatePlanUseCaseProvider);
   final service = ref.read(snapshotBackupServiceProvider);
+  final journal = await ref.watch(rehabJournalProvider.future);
+  final rehabilitation = await ref.watch(rehabProgressProvider.future);
+  final program = journal.program;
+  final now = _planTime(ref, program != null);
   final inputs = jsonEncode([
     activities.map(_planActivityInputs).toList(),
     week,
@@ -58,17 +64,21 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
     prefs.restingHr,
     prefs.thresholdPaceSeconds,
     TrainingPlanConfigArchive.fromDomain(config).toJson(),
+    if (program != null)
+      [
+        program.toJson(),
+        journal.feedback.map((f) => f.toJson()).toList(),
+        now?.toIso8601String().substring(0, 10),
+        rehabilitation?.stage,
+        now?.isBefore(rehabilitation?.recoveryUntil ?? now),
+      ],
   ]);
   return service.resolveTrainingPlan(
     inputs: inputs,
     configuration: config,
+    requireFreshInputs: program != null,
     generate: (effectiveConfig) async {
-      final useCase = GeneratePlanUseCase(
-        analyzeRuns: ref.read(analyzeRunsUseCaseProvider),
-        config: effectiveConfig,
-        sequenceStrategy: base.sequenceStrategy,
-        descriptions: base.descriptions,
-      );
+      final useCase = _configuredUseCase(ref, base, effectiveConfig);
       final plan = await compute(_generatePlan, (
         useCase,
         activities,
@@ -76,6 +86,9 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
         prefs.maxHr,
         prefs.restingHr,
         prefs.thresholdPaceSeconds,
+        rehabilitation,
+        program?.graduatedAt,
+        now,
       ));
       if (!ref.mounted) throw StateError('Training Plan inputs changed.');
       return plan;
@@ -83,14 +96,42 @@ Future<TrainingPlan> trainingPlan(Ref ref) async {
   );
 }
 
+DateTime? _planTime(Ref ref, bool hasProgram) =>
+    hasProgram ? ref.watch(rehabTimeProvider).value ?? DateTime.now() : null;
+
+GeneratePlanUseCase _configuredUseCase(
+  Ref ref,
+  GeneratePlanUseCase base,
+  TrainingPlanConfig config,
+) => GeneratePlanUseCase(
+  analyzeRuns: ref.read(analyzeRunsUseCaseProvider),
+  config: config,
+  sequenceStrategy: base.sequenceStrategy,
+  descriptions: base.descriptions,
+);
+
 TrainingPlan _generatePlan(
-  (GeneratePlanUseCase, List<Activity>, int, int?, int?, int?) inputs,
+  (
+    GeneratePlanUseCase,
+    List<Activity>,
+    int,
+    int?,
+    int?,
+    int?,
+    RehabProgress?,
+    DateTime?,
+    DateTime?,
+  )
+  inputs,
 ) => inputs.$1.generate(
   inputs.$2,
   weekInCycle: inputs.$3,
   userMaxHr: inputs.$4,
   userRestingHr: inputs.$5,
   userThresholdPaceSeconds: inputs.$6,
+  rehabilitation: inputs.$7,
+  rehabilitationGraduatedAt: inputs.$8,
+  now: inputs.$9,
 );
 
 List<Object?> _planActivityInputs(Activity activity) => [

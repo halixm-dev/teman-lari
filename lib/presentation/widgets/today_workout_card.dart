@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../domain/entities/training_plan.dart';
 import '../providers/training_plan_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -34,7 +33,7 @@ class TodayWorkoutCard extends ConsumerWidget {
 
         if (day == null) return const SizedBox.shrink();
 
-        final isRest = day.type == WorkoutType.rest;
+        final isRest = !day.canRecordRun;
 
         return ScaleOnPress(
           onTap: isRest

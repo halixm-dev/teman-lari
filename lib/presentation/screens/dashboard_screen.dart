@@ -11,6 +11,7 @@ import '../widgets/fitness_form_card.dart';
 import '../widgets/manual_run_entry_sheet.dart';
 import '../widgets/recent_activities_list.dart';
 import '../widgets/today_workout_card.dart';
+import '../widgets/rehab/rehab_card.dart';
 import '../widgets/weekly_volume_chart.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -110,6 +111,7 @@ class _DashboardData extends ConsumerWidget {
                     FitnessFormCard(stats: stats),
                     const SizedBox(height: 24),
                     const TodayWorkoutCard(),
+                    RehabCard(stats: stats),
                     const SizedBox(height: 24),
                     WeeklyVolumeChart(stats: stats),
                     const SizedBox(height: 24),

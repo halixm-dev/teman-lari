@@ -238,7 +238,7 @@ final class TrainingPlanProvider
   }
 }
 
-String _$trainingPlanHash() => r'2dc10001cb515dc799f2d1817ec18b43bc04be93';
+String _$trainingPlanHash() => r'a9ed024548941b6422e5512ee79474308e3beca6';
 
 @ProviderFor(WeekInCycleNotifier)
 final weekInCycleProvider = WeekInCycleNotifierProvider._();

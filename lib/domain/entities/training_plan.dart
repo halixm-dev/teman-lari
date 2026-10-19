@@ -38,6 +38,9 @@ class TrainingDay {
     work -= coolDownMinutes ?? 0;
     return work;
   }
+
+  bool get canRecordRun =>
+      type != WorkoutType.rest && type != WorkoutType.crossTraining;
 }
 
 class TrainingPlan {

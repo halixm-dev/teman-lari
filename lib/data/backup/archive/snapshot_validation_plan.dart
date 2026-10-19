@@ -1,9 +1,10 @@
 import '../../../domain/usecases/training_plan_config.dart';
 import 'snapshot_validation_values.dart';
 import 'training_plan_config_archive.dart';
+import '../../../domain/entities/rehab_program.dart';
 
-void validateArchivePlan(Object? value) {
-  archiveShape(value, {
+void validateArchivePlan(Object? value, {bool rehabilitation = false}) {
+  final row = archiveShape(value, {
     'plans': archiveList(_planRecord),
     'active_plan_id': archiveNullable(archiveNonempty),
     'configuration': archiveNullable(_configuration),
@@ -11,6 +12,22 @@ void validateArchivePlan(Object? value) {
     'cycle_start_date': (v) => archivePreference(v, archiveInstant),
     'modified_at': archiveNullable(archiveInstant),
   });
+  final program = row['rehabilitation'];
+  if (program != null) {
+    if (!rehabilitation) {
+      throw const FormatException('Rehab episodes require backup schema 3.');
+    }
+    RehabProgram.fromJson(
+      archiveShape(program, {
+        'started_at': archiveInstant,
+        'injury_site': archiveString,
+        'mode': archiveString,
+        'initial_weekly_minutes': archiveNonnegative,
+        'ramp_weeks': archiveNonnegativeInteger,
+        'graduated_at': archiveNullable(archiveInstant),
+      }),
+    );
+  }
   archiveUnique(archiveObject(value)['plans'] as List, 'id');
 }
 

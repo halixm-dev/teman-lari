@@ -93,6 +93,29 @@ class RunningStats {
     );
   }
 
+  RunningStats withReturnContext(ReturnContext context) => RunningStats(
+    totalRuns: totalRuns,
+    totalDistanceKm: totalDistanceKm,
+    weeklyVolume: weeklyVolume,
+    weeklyMinutes: weeklyMinutes,
+    averagePace: averagePace,
+    paceProgression: paceProgression,
+    heartRateZones: heartRateZones,
+    trainingLoadHistory: trainingLoadHistory,
+    vo2MaxEstimate: vo2MaxEstimate,
+    fitnessScore: fitnessScore,
+    fatigueScore: fatigueScore,
+    formScore: formScore,
+    returnContext: context,
+    recommendedPhase: context.isReturning
+        ? CyclePhase.returning
+        : recommendedPhase,
+    analyzedActivities: analyzedActivities,
+    firstActivityDate: firstActivityDate,
+    longestRecentRunMinutes: longestRecentRunMinutes,
+    acwr: acwr,
+  );
+
   double get recentWeeklyAvgKm {
     if (weeklyVolume.isEmpty) return 0;
     final values = weeklyVolume.values.toList();

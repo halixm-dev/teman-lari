@@ -4,6 +4,7 @@ import 'archive_profile.dart';
 import 'training_plan_content_archive.dart';
 import 'training_plan_config_archive.dart';
 import 'training_plan_validation.dart';
+import '../../../domain/entities/rehab_program.dart';
 
 part 'training_plan_section.g.dart';
 
@@ -15,6 +16,8 @@ class TrainingPlanArchive {
   final ArchivePreference weekInCycle;
   final ArchivePreference cycleStartDate;
   final DateTime? modifiedAt;
+  @JsonKey(includeIfNull: false)
+  final RehabProgram? rehabilitation;
   const TrainingPlanArchive({
     required this.plans,
     required this.activePlanId,
@@ -22,6 +25,7 @@ class TrainingPlanArchive {
     required this.weekInCycle,
     required this.cycleStartDate,
     required this.modifiedAt,
+    this.rehabilitation,
   });
   int get recordCount => plans.length;
   factory TrainingPlanArchive.fromJson(Map<String, dynamic> json) {
@@ -44,6 +48,17 @@ class TrainingPlanArchive {
     return state;
   }
   Map<String, dynamic> toJson() => _$TrainingPlanArchiveToJson(this);
+
+  TrainingPlanArchive withRehabilitation(RehabProgram program, DateTime time) =>
+      TrainingPlanArchive(
+        plans: plans,
+        activePlanId: activePlanId,
+        configuration: configuration,
+        weekInCycle: weekInCycle,
+        cycleStartDate: cycleStartDate,
+        modifiedAt: time.toUtc(),
+        rehabilitation: program,
+      );
 }
 
 @JsonSerializable(fieldRename: FieldRename.snake, explicitToJson: true)

@@ -33,7 +33,8 @@ Map<String, dynamic> validateSnapshotArchive(Uint8List bytes) {
   final version = archive['schema_version'];
   if (archive['product'] != 'teman_lari' ||
       (version != SnapshotArchive.originalSchema &&
-          version != SnapshotArchive.nullableElevationSchema)) {
+          version != SnapshotArchive.nullableElevationSchema &&
+          version != SnapshotArchive.closedLoopRehabSchema)) {
     throw FormatException('Unsupported backup product or schema.');
   }
   final data = archiveObject(archive['data']);
@@ -43,7 +44,9 @@ Map<String, dynamic> validateSnapshotArchive(Uint8List bytes) {
   }
   validateArchiveSections(
     data,
-    nullableElevation: version == SnapshotArchive.nullableElevationSchema,
+    nullableElevation:
+        (version as int) >= SnapshotArchive.nullableElevationSchema,
+    rehabilitation: version >= SnapshotArchive.closedLoopRehabSchema,
   );
   validateArchiveReferences(data);
   _counts(archiveObject(archive['counts']), data);

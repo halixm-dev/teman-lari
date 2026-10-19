@@ -5,6 +5,7 @@ import 'snapshot_validation_plan.dart';
 void validateArchiveSections(
   Map<String, dynamic> data, {
   bool nullableElevation = false,
+  bool rehabilitation = false,
 }) {
   _profile(data['profile']);
   archiveList(
@@ -12,12 +13,17 @@ void validateArchiveSections(
   )(data['activities']);
   validateArchiveAliasOwnership(data['activities'] as List);
   archiveList(_stream)(data['heart_rate_streams']);
-  validateArchivePlan(data['training_plan_state']);
+  validateArchivePlan(
+    data['training_plan_state'],
+    rehabilitation: rehabilitation,
+  );
   archiveShape(data['equipment'], {
     'shoes': archiveList(_shoe),
     'activity_assignments': archiveList(_assignment),
   });
-  archiveShape(data['rehab_feedback'], {'records': archiveList(_feedback)});
+  archiveShape(data['rehab_feedback'], {
+    'records': archiveList((v) => _feedback(v, rehabilitation: rehabilitation)),
+  });
 }
 
 void _profile(Object? value) {
@@ -96,8 +102,8 @@ void _assignment(Object? value) {
   }
 }
 
-void _feedback(Object? value) {
-  archiveShape(value, {
+void _feedback(Object? value, {required bool rehabilitation}) {
+  final row = archiveShape(value, {
     'id': archiveNonempty,
     'activity_id': archiveIdentity,
     'injury_site': archiveString,
@@ -108,4 +114,12 @@ void _feedback(Object? value) {
     'morning_after_recorded_at': archiveNullable(archiveInstant),
     'modified_at': archiveNullable(archiveInstant),
   });
+  for (final key in ['acute_sharp_pain', 'morning_baseline_cleared']) {
+    if (row[key] != null && !rehabilitation) {
+      throw const FormatException(
+        'Rehab observations require backup schema 3.',
+      );
+    }
+    if (row.containsKey(key)) archiveNullable(archiveBool)(row[key]);
+  }
 }

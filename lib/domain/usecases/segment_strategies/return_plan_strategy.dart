@@ -5,6 +5,7 @@ import '../training_plan_config.dart';
 import '../workout_descriptions.dart';
 import '../workout_sequence_strategy.dart';
 import '../schedule_constraints.dart';
+import '../rehab_week_planner.dart';
 import 'segment_plan_strategy.dart';
 
 class ReturnPlanStrategy extends SegmentPlanStrategy {
@@ -15,6 +16,8 @@ class ReturnPlanStrategy extends SegmentPlanStrategy {
     TrainingPlanConfig config,
   ) {
     final returnCtx = stats.returnContext;
+    final rehab = returnCtx?.rehabilitation;
+    if (rehab != null) return rehab.weeklyMinutes;
     if (returnCtx == null || !returnCtx.isReturning) {
       return config.minWeeklyMinutes; // Fallback
     }
@@ -48,6 +51,17 @@ class ReturnPlanStrategy extends SegmentPlanStrategy {
     );
 
     final easyMin = (finalWeeklyMinutes * config.easyFraction).round();
+    final rehab = stats.returnContext?.rehabilitation;
+    if (rehab != null) {
+      return RehabWeekPlanner().build(
+        progress: rehab,
+        weeklyMinutes: finalWeeklyMinutes,
+        startDate: startDate,
+        sequence: sequence,
+        pace: paceZones[1],
+        heartRate: hrZones[1],
+      );
+    }
 
     return List.generate(7, (i) {
       final date = startDate.add(Duration(days: i));

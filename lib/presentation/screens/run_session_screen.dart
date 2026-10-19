@@ -22,6 +22,7 @@ import '../widgets/run_session/run_secondary_metrics.dart';
 import '../widgets/run_session/run_session_state.dart';
 import '../widgets/run_session/run_session_controller.dart';
 import '../widgets/run_session/run_timer_display.dart';
+import '../widgets/rehab/post_run_rehab_action.dart';
 
 enum PaceSource { gps, pedometer, none }
 
@@ -773,6 +774,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
           ),
           const SizedBox(height: 8),
           _buildSaveButton(),
+          if (_isSaved) PostRunRehabAction(activity: _pendingActivity),
         ],
       ),
     );

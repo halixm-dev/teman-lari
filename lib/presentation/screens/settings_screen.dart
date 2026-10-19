@@ -13,6 +13,7 @@ import '../widgets/settings/heart_rate_card.dart';
 import '../widgets/settings/save_button.dart';
 import '../widgets/settings/strava_integration_card.dart';
 import '../widgets/settings/zones_preview_card.dart';
+import '../widgets/rehab/rehab_card.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -345,6 +346,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: Icons.sync_alt_rounded,
             ),
             const StravaIntegrationCard(),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: RehabCard(allowStart: true),
+            ),
             const _SectionHeader(
               title: 'About',
               icon: Icons.info_outline_rounded,

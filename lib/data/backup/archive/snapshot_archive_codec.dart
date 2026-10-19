@@ -29,9 +29,7 @@ class SnapshotArchiveCodec {
   ) {
     final data = _data(snapshot);
     final archive = SnapshotArchive(
-      schemaVersion: data.activities.any((a) => a.totalElevationGain == null)
-          ? SnapshotArchive.nullableElevationSchema
-          : SnapshotArchive.originalSchema,
+      schemaVersion: _schema(data),
       snapshotId: id,
       createdAt: now.toUtc(),
       appVersion: appVersion,
@@ -66,6 +64,20 @@ class SnapshotArchiveCodec {
       'equipment': data.equipment.recordCount,
       'rehab_feedback': data.rehabFeedback.recordCount,
     };
+  }
+
+  int _schema(SnapshotArchiveData data) {
+    if (data.trainingPlanState.rehabilitation != null ||
+        data.rehabFeedback.records.any(
+          (record) =>
+              record.acuteSharpPain != null ||
+              record.morningBaselineCleared != null,
+        )) {
+      return SnapshotArchive.closedLoopRehabSchema;
+    }
+    return data.activities.any((a) => a.totalElevationGain == null)
+        ? SnapshotArchive.nullableElevationSchema
+        : SnapshotArchive.originalSchema;
   }
 
   SnapshotArchiveData _data(LocalSnapshot snapshot) {

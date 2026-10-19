@@ -10,6 +10,7 @@ import '../providers/training_plan_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/scale_on_press.dart';
 import '../widgets/workout_type_badge.dart';
+import '../widgets/rehab/rehab_card.dart';
 
 class PlanScreen extends ConsumerWidget {
   const PlanScreen({super.key});
@@ -248,8 +249,10 @@ class _PlanDataView extends StatelessWidget {
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: plan.days.length,
-            itemBuilder: (context, i) {
+            itemCount: plan.days.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return const RehabCard();
+              final i = index - 1;
               final isFirst = i == 0;
               final card = _PlanDayCard(day: plan.days[i], isFirst: isFirst);
 
@@ -425,7 +428,7 @@ class _PlanDayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRest = day.type == WorkoutType.rest;
+    final isRest = !day.canRecordRun;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = isFirst
         ? AppColors.brandOrange

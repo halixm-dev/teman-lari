@@ -10,6 +10,7 @@ part 'snapshot_archive.g.dart';
 class SnapshotArchive {
   static const originalSchema = 1;
   static const nullableElevationSchema = 2;
+  static const closedLoopRehabSchema = 3;
   final String product;
   final int schemaVersion;
   final String snapshotId;
