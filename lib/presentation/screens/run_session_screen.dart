@@ -20,6 +20,7 @@ import '../widgets/run_session/run_controls.dart';
 import '../widgets/run_session/run_pacer_display.dart';
 import '../widgets/run_session/run_secondary_metrics.dart';
 import '../widgets/run_session/run_session_state.dart';
+import '../widgets/run_session/run_session_controller.dart';
 import '../widgets/run_session/run_timer_display.dart';
 
 enum PaceSource { gps, pedometer, none }
@@ -35,6 +36,7 @@ class RunSessionScreen extends ConsumerStatefulWidget {
 
 class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   late RunSessionState _state;
+  final _session = RunSessionController();
   Timer? _timer;
 
   final _gpsService = GpsService();
@@ -113,17 +115,28 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   void _onGpsPosition(Position pos) {
     _gpsHasFix = true;
     _lastGpsUpdate = DateTime.now();
+    _session.recordElevation(
+      altitude: pos.altitude,
+      altitudeAccuracy: pos.altitudeAccuracy,
+      horizontalAccuracy: pos.accuracy,
+      timestamp: pos.timestamp,
+    );
 
     if (!_state.isRunning) {
       _paceSource = PaceSource.gps;
       setState(() {});
+      return;
     }
-
-    final rawSpeed = pos.speed;
 
     // Ignore highly inaccurate points for speed calculation
     if (pos.accuracy > 30) return;
+    _updateGpsSpeed(pos);
+    _updateGpsDistance(pos);
+    _lastPosition = pos;
+  }
 
+  void _updateGpsSpeed(Position pos) {
+    final rawSpeed = pos.speed;
     if (rawSpeed > 0) {
       if (_smoothedSpeed == 0) {
         _smoothedSpeed = rawSpeed;
@@ -158,7 +171,9 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     if (_smoothedSpeed > _minGpsSpeed) {
       _gpsPaceSeconds = (1000 / _smoothedSpeed).round();
     }
+  }
 
+  void _updateGpsDistance(Position pos) {
     final lastPos = _lastPosition;
     if (pos.accuracy < 50 && lastPos != null) {
       final last = lastPos;
@@ -185,8 +200,6 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
         _pedometerService.calibrateStrideLength(dist);
       }
     }
-
-    _lastPosition = pos;
   }
 
   void _onPedometerStep(int steps) {
@@ -195,6 +208,8 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
   void _start() {
     if (_timer?.isActive ?? false) return;
+    _session.start(DateTime.now());
+    _lastPosition = null;
 
     _lastStepCount = _pedometerService.stepsSinceStart;
     _stepHistory.clear();
@@ -223,6 +238,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
   void _pause() {
     _timer?.cancel();
+    _session.pause();
     if (_state.isAudioCoachOn) _soundFx.playPause();
     setState(() {
       _state = RunSessionState(
@@ -403,6 +419,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
   Future<void> _saveWorkout() async {
     if (_isSaved || _isSaving) return;
+    _session.pause();
     final activity = _pendingActivity ??= _recordWorkout();
     setState(() {
       _isSaving = true;
@@ -445,12 +462,12 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     return Activity(
       id: -DateTime.now().millisecondsSinceEpoch,
       name: name,
-      date: DateTime.now(),
+      date: _session.startedAt ?? DateTime.now(),
       type: ActivityType.run,
       distanceKm: _state.distanceKm,
       movingTime: Duration(seconds: _state.elapsedSeconds),
       pace: Duration(seconds: paceSec),
-      elevationGainM: 0.0,
+      elevationGainM: _session.elevationGainM,
       trainingLoad: TrainingLoad.moderate,
       avgCadence: avgCadence,
       isLocal: true,

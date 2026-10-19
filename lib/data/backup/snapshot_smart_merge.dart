@@ -149,13 +149,13 @@ class _MergePlanner {
       'distance',
       'moving_time',
       'elapsed_time',
-      'total_elevation_gain',
       'average_speed',
       'max_speed',
     ]) {
       if (current[key] != input[key]) conflicts++;
     }
     for (final key in const [
+      'total_elevation_gain',
       'average_heartrate',
       'max_heartrate',
       'average_cadence',

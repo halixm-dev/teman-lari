@@ -9,7 +9,9 @@ part of 'snapshot_archive.dart';
 SnapshotArchive _$SnapshotArchiveFromJson(Map<String, dynamic> json) =>
     SnapshotArchive(
       product: json['product'] as String? ?? 'teman_lari',
-      schemaVersion: (json['schema_version'] as num?)?.toInt() ?? 1,
+      schemaVersion:
+          (json['schema_version'] as num?)?.toInt() ??
+          SnapshotArchive.originalSchema,
       snapshotId: json['snapshot_id'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
       appVersion: json['app_version'] as String,
@@ -71,7 +73,7 @@ ArchiveActivity _$ArchiveActivityFromJson(Map<String, dynamic> json) =>
       distance: (json['distance'] as num).toDouble(),
       movingTime: (json['moving_time'] as num).toInt(),
       elapsedTime: (json['elapsed_time'] as num).toInt(),
-      totalElevationGain: (json['total_elevation_gain'] as num).toDouble(),
+      totalElevationGain: (json['total_elevation_gain'] as num?)?.toDouble(),
       startDate: json['start_date'] as String,
       averageSpeed: (json['average_speed'] as num).toDouble(),
       maxSpeed: (json['max_speed'] as num).toDouble(),

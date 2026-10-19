@@ -29,6 +29,9 @@ class SnapshotArchiveCodec {
   ) {
     final data = _data(snapshot);
     final archive = SnapshotArchive(
+      schemaVersion: data.activities.any((a) => a.totalElevationGain == null)
+          ? SnapshotArchive.nullableElevationSchema
+          : SnapshotArchive.originalSchema,
       snapshotId: id,
       createdAt: now.toUtc(),
       appVersion: appVersion,

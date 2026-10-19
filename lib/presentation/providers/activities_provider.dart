@@ -123,7 +123,7 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
       distanceKm: distanceKm,
       movingTime: duration,
       pace: Duration(seconds: paceSeconds),
-      elevationGainM: 0.0,
+      elevationGainM: null,
       trainingLoad: load,
       perceivedExertion: perceivedExertion,
       isLocal: true,

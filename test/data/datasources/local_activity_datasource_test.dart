@@ -67,6 +67,17 @@ void main() {
   ];
 
   group('LocalActivityDataSource - Hive Refactor Tests', () {
+    test('unknown elevation survives closing and reopening storage', () async {
+      final activity = mockActivities.first.copyWith(totalElevationGain: null);
+      await dataSource.saveActivity(activity);
+      await Hive.close();
+
+      final restored = await LocalActivityDataSource().getAllActivities();
+      check(restored).length.equals(1);
+      check(restored.single.totalElevationGain).isNull();
+      check(restored.single.startDate).equals('2026-05-20T08:00:00Z');
+    });
+
     test(
       'saveActivities and getCachedActivities returns activities in descending ID order',
       () async {

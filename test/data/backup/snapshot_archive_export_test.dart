@@ -40,6 +40,24 @@ void main() {
     await Hive.close();
     await directory.delete(recursive: true);
   });
+  test('unknown elevation survives backup export and restore', () async {
+    final local = LocalActivityDataSource(coordinator: service.coordinator);
+    await local.saveActivity(
+      activity(-7, 'Run').copyWith(totalElevationGain: null),
+    );
+    final file = await service.prepareExport();
+    final archive = jsonDecode(utf8.decode(file.bytes)) as Map;
+    check(archive['schema_version']).equals(2);
+    await local.clearCache();
+    final preview = await service.prepareImport(file.bytes);
+    await service.applyImport(preview);
+
+    final restored = await local.getAllActivities();
+    check(restored).length.equals(1);
+    check(restored.single.totalElevationGain).isNull();
+    check(restored.single.startDate).equals('1990-01-02T03:04:05.000Z');
+  });
+
   test(
     'guest exports a complete empty archive without installation secrets',
     () async {

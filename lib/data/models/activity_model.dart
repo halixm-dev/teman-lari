@@ -14,7 +14,7 @@ abstract class ActivityModel with _$ActivityModel {
     required double distance,
     required int movingTime,
     required int elapsedTime,
-    required double totalElevationGain,
+    required double? totalElevationGain,
     required String startDate,
     required double averageSpeed,
     required double maxSpeed,

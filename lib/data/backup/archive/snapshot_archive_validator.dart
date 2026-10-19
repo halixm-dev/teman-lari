@@ -30,7 +30,10 @@ Map<String, dynamic> validateSnapshotArchive(Uint8List bytes) {
     'counts': archiveObject,
     'data': archiveObject,
   });
-  if (archive['product'] != 'teman_lari' || archive['schema_version'] != 1) {
+  final version = archive['schema_version'];
+  if (archive['product'] != 'teman_lari' ||
+      (version != SnapshotArchive.originalSchema &&
+          version != SnapshotArchive.nullableElevationSchema)) {
     throw FormatException('Unsupported backup product or schema.');
   }
   final data = archiveObject(archive['data']);
@@ -38,7 +41,10 @@ Map<String, dynamic> validateSnapshotArchive(Uint8List bytes) {
       archiveSections.difference(data.keys.toSet()).isNotEmpty) {
     throw FormatException('Missing or unsupported backup section.');
   }
-  validateArchiveSections(data);
+  validateArchiveSections(
+    data,
+    nullableElevation: version == SnapshotArchive.nullableElevationSchema,
+  );
   validateArchiveReferences(data);
   _counts(archiveObject(archive['counts']), data);
   SnapshotArchive.fromJson(archive);

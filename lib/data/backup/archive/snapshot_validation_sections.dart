@@ -2,9 +2,14 @@ import '../activity_identity_aliases.dart';
 import 'snapshot_validation_values.dart';
 import 'snapshot_validation_plan.dart';
 
-void validateArchiveSections(Map<String, dynamic> data) {
+void validateArchiveSections(
+  Map<String, dynamic> data, {
+  bool nullableElevation = false,
+}) {
   _profile(data['profile']);
-  archiveList(_activity)(data['activities']);
+  archiveList(
+    (value) => _activity(value, nullableElevation: nullableElevation),
+  )(data['activities']);
   validateArchiveAliasOwnership(data['activities'] as List);
   archiveList(_stream)(data['heart_rate_streams']);
   validateArchivePlan(data['training_plan_state']);
@@ -26,7 +31,7 @@ void _profile(Object? value) {
   });
 }
 
-void _activity(Object? value) {
+void _activity(Object? value, {required bool nullableElevation}) {
   final row = archiveShape(value, {
     'id': archiveIdentity,
     'name': archiveString,
@@ -34,7 +39,9 @@ void _activity(Object? value) {
     'distance': archiveNonnegative,
     'moving_time': archiveNonnegativeInteger,
     'elapsed_time': archiveNonnegativeInteger,
-    'total_elevation_gain': archiveNumber,
+    'total_elevation_gain': nullableElevation
+        ? archiveNullable(archiveNumber)
+        : archiveNumber,
     'start_date': archiveInstant,
     'average_speed': archiveNumber,
     'max_speed': archiveNumber,

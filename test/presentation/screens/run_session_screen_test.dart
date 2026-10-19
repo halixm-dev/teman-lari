@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:teman_lari/core/services/voice_coach_service.dart';
 import 'package:teman_lari/domain/entities/activity.dart';
 import 'package:teman_lari/domain/entities/training_plan.dart';
@@ -66,6 +67,34 @@ class FakeVoiceCoachService implements VoiceCoachService {
   @override
   void dispose() {}
 }
+
+class FakeGeolocator extends GeolocatorPlatform {
+  final positions = StreamController<Position>.broadcast();
+
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.whileInUse;
+
+  @override
+  Stream<Position> getPositionStream({LocationSettings? locationSettings}) =>
+      positions.stream;
+}
+
+Position gpsPosition(double altitude, DateTime timestamp) => Position(
+  longitude: 106.8,
+  latitude: -6.2,
+  timestamp: timestamp,
+  accuracy: 5,
+  altitude: altitude,
+  altitudeAccuracy: 2,
+  heading: 0,
+  headingAccuracy: 0,
+  speed: 0,
+  speedAccuracy: 0,
+);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -131,6 +160,77 @@ void main() {
   }
 
   group('RunSessionScreen auto-save on completion and exit (Ticket 02)', () {
+    testWidgets('measured elevation survives completion and save retry', (
+      tester,
+    ) async {
+      final previousGps = GeolocatorPlatform.instance;
+      final gps = FakeGeolocator();
+      GeolocatorPlatform.instance = gps;
+      addTearDown(() async {
+        GeolocatorPlatform.instance = previousGps;
+        await gps.positions.close();
+      });
+      final repo = FakeActivityRepository()..failSave = true;
+      final day = TrainingDay(
+        date: DateTime(2026, 10, 12),
+        type: WorkoutType.intervals,
+        description: 'Measured climb',
+        intervals: const [
+          IntervalPhase(
+            type: IntervalPhaseType.work,
+            duration: Duration(seconds: 2),
+          ),
+        ],
+      );
+      await tester.pumpWidget(buildTestableScreen(day: day, fakeRepo: repo));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      final now = DateTime.now();
+      gps.positions.add(gpsPosition(100, now));
+      await tester.pump();
+      gps.positions.add(gpsPosition(112, now.add(const Duration(seconds: 1))));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      gps.positions.add(gpsPosition(900, now.add(const Duration(seconds: 3))));
+      await tester.pump();
+      repo.failSave = false;
+      await tester.tap(find.text('Retry Save'));
+      await tester.pumpAndSettle();
+
+      check(repo.activities.single.elevationGainM).equals(12);
+    });
+
+    testWidgets(
+      'saved workout uses its start time instead of completion time',
+      (tester) async {
+        final repo = FakeActivityRepository();
+        final day = TrainingDay(
+          date: DateTime(2026, 10, 12),
+          type: WorkoutType.intervals,
+          description: 'Recorded start',
+          intervals: const [
+            IntervalPhase(
+              type: IntervalPhaseType.work,
+              duration: Duration(seconds: 2),
+            ),
+          ],
+        );
+        await tester.pumpWidget(buildTestableScreen(day: day, fakeRepo: repo));
+        await tester.pump();
+        final beforeStart = DateTime.now();
+        await tester.tap(find.byIcon(Icons.play_arrow));
+        final afterStart = DateTime.now();
+        await tester.pump(const Duration(seconds: 2));
+        await tester.pumpAndSettle();
+
+        final saved = repo.activities.single;
+        check(saved.date.isBefore(beforeStart)).isFalse();
+        check(saved.date.isAfter(afterStart)).isFalse();
+        check(saved.elevationGainM).isNull();
+      },
+    );
+
     testWidgets('failed completion can be retried without losing the run', (
       tester,
     ) async {

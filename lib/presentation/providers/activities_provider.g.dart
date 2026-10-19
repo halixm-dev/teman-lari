@@ -178,7 +178,7 @@ final class ActivitiesNotifierProvider
 }
 
 String _$activitiesNotifierHash() =>
-    r'2dd462e62fa74b08e2cac4e1ea06814b29debec1';
+    r'85298e79b4deddd5e50f8ba3158a37c496012f22';
 
 abstract class _$ActivitiesNotifier extends $AsyncNotifier<List<Activity>> {
   FutureOr<List<Activity>> build();

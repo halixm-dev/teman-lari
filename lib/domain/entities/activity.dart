@@ -12,7 +12,9 @@ class Activity {
   final Duration pace;
   final double? avgHeartRate;
   final double? maxHeartRate;
-  final double elevationGainM;
+
+  /// Null when elevation was unavailable; zero means a measured flat route.
+  final double? elevationGainM;
   final double? avgCadence;
   final int? sufferScore;
   final TrainingLoad trainingLoad;

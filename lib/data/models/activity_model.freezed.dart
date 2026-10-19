@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ActivityModel {
 
- int get id; String get name; String get type; double get distance; int get movingTime; int get elapsedTime; double get totalElevationGain; String get startDate; double get averageSpeed; double get maxSpeed; double? get averageHeartrate; double? get maxHeartrate; double? get averageCadence; int? get sufferScore; bool get hasHeartrate; int? get workoutType; double? get perceivedExertion; String? get shoeId; DateTime? get shoeAssignmentModifiedAt;
+ int get id; String get name; String get type; double get distance; int get movingTime; int get elapsedTime; double? get totalElevationGain; String get startDate; double get averageSpeed; double get maxSpeed; double? get averageHeartrate; double? get maxHeartrate; double? get averageCadence; int? get sufferScore; bool get hasHeartrate; int? get workoutType; double? get perceivedExertion; String? get shoeId; DateTime? get shoeAssignmentModifiedAt;
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -48,7 +48,7 @@ abstract mixin class $ActivityModelCopyWith<$Res>  {
   factory $ActivityModelCopyWith(ActivityModel value, $Res Function(ActivityModel) _then) = _$ActivityModelCopyWithImpl;
 @useResult
 $Res call({
- int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
+ int id, String name, String type, double distance, int movingTime, int elapsedTime, double? totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$ActivityModelCopyWithImpl<$Res>
 
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = freezed,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -73,8 +73,8 @@ as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non
 as String,distance: null == distance ? _self.distance : distance // ignore: cast_nullable_to_non_nullable
 as double,movingTime: null == movingTime ? _self.movingTime : movingTime // ignore: cast_nullable_to_non_nullable
 as int,elapsedTime: null == elapsedTime ? _self.elapsedTime : elapsedTime // ignore: cast_nullable_to_non_nullable
-as int,totalElevationGain: null == totalElevationGain ? _self.totalElevationGain : totalElevationGain // ignore: cast_nullable_to_non_nullable
-as double,startDate: null == startDate ? _self.startDate : startDate // ignore: cast_nullable_to_non_nullable
+as int,totalElevationGain: freezed == totalElevationGain ? _self.totalElevationGain : totalElevationGain // ignore: cast_nullable_to_non_nullable
+as double?,startDate: null == startDate ? _self.startDate : startDate // ignore: cast_nullable_to_non_nullable
 as String,averageSpeed: null == averageSpeed ? _self.averageSpeed : averageSpeed // ignore: cast_nullable_to_non_nullable
 as double,maxSpeed: null == maxSpeed ? _self.maxSpeed : maxSpeed // ignore: cast_nullable_to_non_nullable
 as double,averageHeartrate: freezed == averageHeartrate ? _self.averageHeartrate : averageHeartrate // ignore: cast_nullable_to_non_nullable
@@ -171,7 +171,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double? totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ActivityModel() when $default != null:
 return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
@@ -192,7 +192,7 @@ return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double? totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)  $default,) {final _that = this;
 switch (_that) {
 case _ActivityModel():
 return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
@@ -212,7 +212,7 @@ return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double? totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _ActivityModel() when $default != null:
 return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
@@ -236,7 +236,7 @@ class _ActivityModel extends ActivityModel {
 @override final  double distance;
 @override final  int movingTime;
 @override final  int elapsedTime;
-@override final  double totalElevationGain;
+@override final  double? totalElevationGain;
 @override final  String startDate;
 @override final  double averageSpeed;
 @override final  double maxSpeed;
@@ -283,7 +283,7 @@ abstract mixin class _$ActivityModelCopyWith<$Res> implements $ActivityModelCopy
   factory _$ActivityModelCopyWith(_ActivityModel value, $Res Function(_ActivityModel) _then) = __$ActivityModelCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
+ int id, String name, String type, double distance, int movingTime, int elapsedTime, double? totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
 });
 
 
@@ -300,7 +300,7 @@ class __$ActivityModelCopyWithImpl<$Res>
 
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = freezed,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
   return _then(_ActivityModel(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -308,8 +308,8 @@ as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non
 as String,distance: null == distance ? _self.distance : distance // ignore: cast_nullable_to_non_nullable
 as double,movingTime: null == movingTime ? _self.movingTime : movingTime // ignore: cast_nullable_to_non_nullable
 as int,elapsedTime: null == elapsedTime ? _self.elapsedTime : elapsedTime // ignore: cast_nullable_to_non_nullable
-as int,totalElevationGain: null == totalElevationGain ? _self.totalElevationGain : totalElevationGain // ignore: cast_nullable_to_non_nullable
-as double,startDate: null == startDate ? _self.startDate : startDate // ignore: cast_nullable_to_non_nullable
+as int,totalElevationGain: freezed == totalElevationGain ? _self.totalElevationGain : totalElevationGain // ignore: cast_nullable_to_non_nullable
+as double?,startDate: null == startDate ? _self.startDate : startDate // ignore: cast_nullable_to_non_nullable
 as String,averageSpeed: null == averageSpeed ? _self.averageSpeed : averageSpeed // ignore: cast_nullable_to_non_nullable
 as double,maxSpeed: null == maxSpeed ? _self.maxSpeed : maxSpeed // ignore: cast_nullable_to_non_nullable
 as double,averageHeartrate: freezed == averageHeartrate ? _self.averageHeartrate : averageHeartrate // ignore: cast_nullable_to_non_nullable

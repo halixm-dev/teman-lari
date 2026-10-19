@@ -8,6 +8,8 @@ part 'snapshot_archive.g.dart';
 
 @JsonSerializable(fieldRename: FieldRename.snake, explicitToJson: true)
 class SnapshotArchive {
+  static const originalSchema = 1;
+  static const nullableElevationSchema = 2;
   final String product;
   final int schemaVersion;
   final String snapshotId;
@@ -17,7 +19,7 @@ class SnapshotArchive {
   final SnapshotArchiveData data;
   const SnapshotArchive({
     this.product = 'teman_lari',
-    this.schemaVersion = 1,
+    this.schemaVersion = SnapshotArchive.originalSchema,
     required this.snapshotId,
     required this.createdAt,
     required this.appVersion,
@@ -58,7 +60,7 @@ class ArchiveActivity {
   final double distance;
   final int movingTime;
   final int elapsedTime;
-  final double totalElevationGain;
+  final double? totalElevationGain;
   final String startDate;
   final double averageSpeed;
   final double maxSpeed;

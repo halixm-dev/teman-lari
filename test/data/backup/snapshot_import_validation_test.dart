@@ -31,6 +31,19 @@ void main() {
     await Hive.close();
     await directory.delete(recursive: true);
   });
+  test('version 1 still requires numeric elevation', () async {
+    final populated = await populatedArchive();
+    setAt(populated, 'data.activities.0.total_elevation_gain', null);
+    await check(service.prepareImport(bytes(populated))).throws<Object>();
+  });
+
+  test('version 2 still requires the elevation field', () async {
+    final populated = await populatedArchive()
+      ..['schema_version'] = 2;
+    removeAt(populated, 'data.activities.0.total_elevation_gain');
+    await check(service.prepareImport(bytes(populated))).throws<Object>();
+  });
+
   for (final entry in <String, Object?>{
     'schema_version': 1.5,
     'snapshot_id': '',

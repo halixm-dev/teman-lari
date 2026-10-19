@@ -14,7 +14,7 @@ _ActivityModel _$ActivityModelFromJson(Map<String, dynamic> json) =>
       distance: (json['distance'] as num).toDouble(),
       movingTime: (json['moving_time'] as num).toInt(),
       elapsedTime: (json['elapsed_time'] as num).toInt(),
-      totalElevationGain: (json['total_elevation_gain'] as num).toDouble(),
+      totalElevationGain: (json['total_elevation_gain'] as num?)?.toDouble(),
       startDate: json['start_date'] as String,
       averageSpeed: (json['average_speed'] as num).toDouble(),
       maxSpeed: (json['max_speed'] as num).toDouble(),

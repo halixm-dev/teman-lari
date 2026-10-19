@@ -33,6 +33,31 @@ void main() {
     await directory.delete(recursive: true);
   });
   test(
+    'merge fills unknown elevation and keeps an existing measurement',
+    () async {
+      final local = activity('42', '2025-01-02T00:00:00Z')
+        ..['total_elevation_gain'] = null;
+      await seed(service, [local]);
+      final measured = activity('42', '2025-01-02T00:00:00Z')
+        ..['total_elevation_gain'] = 17.0;
+      await service.applyImport(
+        await service.prepareImport(await archiveBytes([measured])),
+      );
+      final missing = {...measured, 'total_elevation_gain': null};
+      await service.applyImport(
+        await service.prepareImport(
+          await archiveBytes([missing], change: (a) => a['schema_version'] = 2),
+        ),
+      );
+
+      final exported =
+          jsonDecode(utf8.decode((await service.prepareExport()).bytes)) as Map;
+      final runs = (exported['data'] as Map)['activities'] as List;
+      check((runs.single as Map)['total_elevation_gain']).equals(17.0);
+    },
+  );
+
+  test(
     'confirmed merge adds incoming history and retains unrelated local workouts',
     () async {
       await seed(service, [activity('-1', '2025-01-01T00:00:00Z')]);
