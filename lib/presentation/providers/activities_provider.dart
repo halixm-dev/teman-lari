@@ -27,6 +27,7 @@ ActivityRepository activityRepository(Ref ref) {
     localDataSource: ref.read(localActivityDataSourceProvider),
     preferencesStorage: ref.read(preferencesStorageProvider),
     tokenStorage: ref.read(tokenStorageProvider),
+    readLocalOnly: true,
   );
 }
 
@@ -126,6 +127,7 @@ class ActivitiesNotifier extends _$ActivitiesNotifier {
       trainingLoad: load,
       perceivedExertion: perceivedExertion,
       isLocal: true,
+      shoeId: shoeId,
     );
     final repo = ref.read(activityRepositoryProvider);
     await repo.saveActivity(activity);
@@ -142,47 +144,12 @@ Future<RunningStats?> runningStats(Ref ref) async {
   final activities = await ref.watch(activitiesProvider.future);
   final prefs = await ref.watch(hrPreferencesProvider.future);
   final repo = ref.read(activityRepositoryProvider);
-  final sortedActivities = [...activities]
-    ..sort((a, b) => b.date.compareTo(a.date));
-  final withHrIds = sortedActivities
-      .where((a) => a.avgHeartRate != null)
-      .map((a) => a.id)
-      .take(50)
-      .toList();
-
-  List<Activity> target;
-  if (withHrIds.isNotEmpty) {
-    final streams = await repo.getHeartRateStreams(withHrIds);
-    target = activities.map<Activity>((a) {
-      if (a.avgHeartRate == null) return a;
-      final hrData = streams[a.id];
-      if (hrData == null) return a;
-      return Activity(
-        id: a.id,
-        name: a.name,
-        date: a.date,
-        type: a.type,
-        distanceKm: a.distanceKm,
-        movingTime: a.movingTime,
-        pace: a.pace,
-        elevationGainM: a.elevationGainM,
-        trainingLoad: a.trainingLoad,
-        avgHeartRate: a.avgHeartRate,
-        maxHeartRate: a.maxHeartRate,
-        avgCadence: a.avgCadence,
-        sufferScore: a.sufferScore,
-        heartRateData: hrData,
-        perceivedExertion: a.perceivedExertion,
-        isLocal: a.isLocal,
-      );
-    }).toList();
-  } else {
-    target = activities;
-  }
+  final target = await _heartRateActivities(activities, repo);
 
   final useCase = ref.read(analyzeRunsUseCaseProvider);
-  final userThresholdPace = prefs.thresholdPaceSeconds != null
-      ? Duration(seconds: prefs.thresholdPaceSeconds!)
+  final thresholdPace = prefs.thresholdPaceSeconds;
+  final userThresholdPace = thresholdPace != null
+      ? Duration(seconds: thresholdPace)
       : null;
 
   final stats = kIsWeb
@@ -201,19 +168,56 @@ Future<RunningStats?> runningStats(Ref ref) async {
           ),
         );
 
-  final activityMaxHr = target
-      .map((a) => a.maxHeartRate)
-      .whereType<double>()
-      .fold<double?>(
-        null,
-        (max, hr) => max == null ? hr : (hr > max ? hr : max),
-      );
+  return stats;
+}
 
-  if (activityMaxHr != null) {
-    await ref
-        .read(hrPreferencesProvider.notifier)
-        .updateFromStrava(activityMaxHr: activityMaxHr.round());
+Future<List<Activity>> _heartRateActivities(
+  List<Activity> activities,
+  ActivityRepository repo,
+) async {
+  final sortedActivities = [...activities]
+    ..sort((a, b) => b.date.compareTo(a.date));
+  final withHrIds = sortedActivities
+      .where((a) => a.avgHeartRate != null)
+      .map((a) => a.id)
+      .take(50)
+      .toList();
+
+  List<Activity> target;
+  if (withHrIds.isNotEmpty) {
+    final streams = await repo.getHeartRateStreams(withHrIds);
+    target = activities.map<Activity>((a) {
+      if (a.avgHeartRate == null) return a;
+      final hrData = streams[a.id];
+      if (hrData == null) return a;
+      return _activityWithHeartRate(a, hrData);
+    }).toList();
+  } else {
+    target = activities;
   }
 
-  return stats;
+  return target;
+}
+
+Activity _activityWithHeartRate(Activity a, List<double> hrData) {
+  return Activity(
+    id: a.id,
+    name: a.name,
+    date: a.date,
+    type: a.type,
+    distanceKm: a.distanceKm,
+    movingTime: a.movingTime,
+    pace: a.pace,
+    elevationGainM: a.elevationGainM,
+    trainingLoad: a.trainingLoad,
+    avgHeartRate: a.avgHeartRate,
+    maxHeartRate: a.maxHeartRate,
+    avgCadence: a.avgCadence,
+    sufferScore: a.sufferScore,
+    heartRateData: hrData,
+    perceivedExertion: a.perceivedExertion,
+    isLocal: a.isLocal,
+    shoeId: a.shoeId,
+    shoeAssignmentModifiedAt: a.shoeAssignmentModifiedAt,
+  );
 }

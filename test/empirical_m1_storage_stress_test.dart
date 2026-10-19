@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:teman_lari/core/errors/exceptions.dart';
 import 'package:teman_lari/data/datasources/local_activity_datasource.dart';
 import 'package:teman_lari/data/datasources/preferences_storage.dart';
@@ -101,12 +102,14 @@ ActivityModel makeTestModel({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
   late LocalActivityDataSource dataSource;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('m1_empirical_stress_');
     Hive.init(tempDir.path);
+    SharedPreferences.setMockInitialValues({});
     dataSource = LocalActivityDataSource();
   });
 
@@ -628,6 +631,7 @@ void main() {
 
         // Simulate app restart: re-initialize Hive in same directory
         Hive.init(tempDir.path);
+        SharedPreferences.setMockInitialValues({});
         final newDataSource = LocalActivityDataSource();
 
         final reloaded = await newDataSource.getAllActivities();

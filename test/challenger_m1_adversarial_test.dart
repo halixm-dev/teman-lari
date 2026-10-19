@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:teman_lari/data/backup/local_data_coordinator.dart';
+import 'package:teman_lari/data/backup/snapshot_backup_service.dart';
 import 'package:teman_lari/core/errors/exceptions.dart';
 import 'package:teman_lari/data/datasources/local_activity_datasource.dart';
 import 'package:teman_lari/data/datasources/preferences_storage.dart';
@@ -146,6 +149,7 @@ ActivityModel createSampleModel(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
   late LocalActivityDataSource localDataSource;
   late SpyStravaActivityDataSource spyRemote;
@@ -478,6 +482,12 @@ void main() {
     test(
       '10 concurrent updateLocalActivityId operations execute safely',
       () async {
+        SharedPreferences.setMockInitialValues({});
+        final service = SnapshotBackupService(
+          coordinator: LocalDataCoordinator(),
+        );
+        await service.initialize();
+        localDataSource = LocalActivityDataSource(backupService: service);
         for (var i = 0; i < 10; i++) {
           await localDataSource.saveActivity(
             createSampleModel(-2000 - i, name: 'Local Workout $i'),

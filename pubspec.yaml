@@ -49,6 +49,9 @@ dependencies:
   google_fonts: ^8.1.0
   phosphor_flutter: ^2.1.0
   flutter_animate: ^4.5.2
+  file_picker: 10.3.10
+  path_provider: ^2.1.6
+  package_info_plus: 9.0.1
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +65,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
   checks: ^0.3.1
+  analyzer: ^9.0.0
 
 flutter_launcher_icons:
   android: "launcher_icon"

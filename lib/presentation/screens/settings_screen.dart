@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/responsive.dart';
 import '../providers/core_provider.dart';
 import '../providers/preferences_provider.dart';
+import '../providers/local_backup_refresh.dart';
 import '../theme/app_colors.dart';
 import '../widgets/settings/about_card.dart';
+import '../widgets/settings/backup_card.dart';
 import '../widgets/settings/heart_rate_card.dart';
 import '../widgets/settings/save_button.dart';
 import '../widgets/settings/strava_integration_card.dart';
@@ -35,6 +37,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _storedAthleteName;
   bool _isSaving = false;
   bool _showSuccess = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -60,8 +63,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final prefs = await ref.read(hrPreferencesProvider.future);
-    final athleteName = await ref.read(athleteNameProvider.future);
+    final generation = ++_loadGeneration;
+    final preferences = ref.read(hrPreferencesProvider.future);
+    final name = ref.read(athleteNameProvider.future);
+    final prefs = await preferences;
+    final athleteName = await name;
+    if (!mounted || generation != _loadGeneration) return;
 
     _restingHrController.removeListener(_onFieldChanged);
     _maxHrController.removeListener(_onFieldChanged);
@@ -201,43 +208,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final nameText = _athleteNameController.text.trim();
 
     try {
-      final preferencesNotifier = ref.read(hrPreferencesProvider.notifier);
-      final preferencesStorage = ref.read(preferencesStorageProvider);
+      await ref.read(preferencesStorageProvider).coordinator.write(() async {
+        await _persistAthleteName(nameText);
+        await _persistHrPreferences(restingText, maxText, paceText);
+      });
 
-      final nameToSave = nameText.isNotEmpty ? nameText : 'Runner';
-      await preferencesStorage.saveAthleteName(nameToSave);
-      _storedAthleteName = nameToSave;
-      ref.invalidate(athleteNameProvider);
-
-      if (restingText.isEmpty) {
-        await preferencesNotifier.clearRestingHr();
-      } else {
-        final parsed = int.tryParse(restingText);
-        if (parsed != null) {
-          await preferencesNotifier.saveRestingHr(parsed);
-        }
-      }
-
-      if (maxText.isEmpty) {
-        await preferencesNotifier.clearMaxHr();
-      } else {
-        final parsed = int.tryParse(maxText);
-        if (parsed != null) {
-          await preferencesNotifier.saveMaxHr(parsed);
-        }
-      }
-
-      if (paceText.isEmpty) {
-        await preferencesNotifier.clearThresholdPace();
-      } else {
-        final parsed = ThresholdPaceUtils.parsePace(paceText);
-        if (parsed != null && ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
-          await preferencesNotifier.saveThresholdPace(parsed);
-        }
-      }
-
-      // Reload stored values to reset "Save Changes" button state
       final prefs = await ref.read(hrPreferencesProvider.future);
+      if (!mounted) return;
       _storedRestingHr = prefs.restingHr;
       _storedMaxHr = prefs.maxHr;
       _storedThresholdPace = prefs.thresholdPaceSeconds;
@@ -259,6 +236,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to save settings: $e')));
+      }
+    }
+  }
+
+  Future<void> _persistAthleteName(String nameText) async {
+    final preferencesStorage = ref.read(preferencesStorageProvider);
+    final nameToSave = nameText.isNotEmpty ? nameText : 'Runner';
+    await preferencesStorage.saveAthleteName(nameToSave);
+    _storedAthleteName = nameToSave;
+    ref.invalidate(athleteNameProvider);
+  }
+
+  Future<void> _persistHrPreferences(
+    String restingText,
+    String maxText,
+    String paceText,
+  ) async {
+    final notifier = ref.read(hrPreferencesProvider.notifier);
+    if (restingText.isEmpty) {
+      await notifier.clearRestingHr();
+    } else {
+      final parsed = int.tryParse(restingText);
+      if (parsed != null) await notifier.saveRestingHr(parsed);
+    }
+
+    if (maxText.isEmpty) {
+      await notifier.clearMaxHr();
+    } else {
+      final parsed = int.tryParse(maxText);
+      if (parsed != null) await notifier.saveMaxHr(parsed);
+    }
+
+    if (paceText.isEmpty) {
+      await notifier.clearThresholdPace();
+    } else {
+      final parsed = ThresholdPaceUtils.parsePace(paceText);
+      if (parsed != null && ThresholdPaceUtils.isValidPaceSeconds(parsed)) {
+        await notifier.saveThresholdPace(parsed);
       }
     }
   }
@@ -299,6 +314,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(localBackupRefreshEpochProvider, (previous, next) {
+      if (previous != next) _load();
+    });
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ConstrainedContent(
@@ -331,6 +349,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               title: 'About',
               icon: Icons.info_outline_rounded,
             ),
+            const BackupCard(),
             const AboutCard(),
           ],
         ),
@@ -432,29 +451,27 @@ class _ProfileCard extends StatelessWidget {
             TextField(
               key: const ValueKey('settings_athlete_name_input'),
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Athlete Name',
-                hintText: 'e.g. Alex, Budi',
-                prefixIcon: Icon(
-                  Icons.person_outline,
-                  color: AppColors.gray500,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  borderSide: BorderSide(
-                    color: AppColors.brandOrange,
-                    width: 2,
-                  ),
-                ),
-                isDense: true,
-              ),
+              decoration: _buildInputDecoration(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration() {
+    return const InputDecoration(
+      labelText: 'Athlete Name',
+      hintText: 'e.g. Alex, Budi',
+      prefixIcon: Icon(Icons.person_outline, color: AppColors.gray500),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: AppColors.brandOrange, width: 2),
+      ),
+      isDense: true,
     );
   }
 }

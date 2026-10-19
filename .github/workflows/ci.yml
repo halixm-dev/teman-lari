@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
@@ -26,6 +28,9 @@ jobs:
 
       - name: Format Check
         run: dart format --set-exit-if-changed .
+
+      - name: Standards Guardrail
+        run: dart run tool/check_standards.dart
 
       - name: Run Tests
         run: flutter test --coverage

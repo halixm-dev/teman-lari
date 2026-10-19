@@ -238,7 +238,7 @@ final class TrainingPlanProvider
   }
 }
 
-String _$trainingPlanHash() => r'9f82665829e694faa1862d824bcc7d897c848626';
+String _$trainingPlanHash() => r'2dc10001cb515dc799f2d1817ec18b43bc04be93';
 
 @ProviderFor(WeekInCycleNotifier)
 final weekInCycleProvider = WeekInCycleNotifierProvider._();
@@ -265,7 +265,7 @@ final class WeekInCycleNotifierProvider
 }
 
 String _$weekInCycleNotifierHash() =>
-    r'd60591f44d22b19a70b48a0be64b5ddafb3038be';
+    r'de7f00fc89fabacf941269757c053183a46f6110';
 
 abstract class _$WeekInCycleNotifier extends $AsyncNotifier<int> {
   FutureOr<int> build();

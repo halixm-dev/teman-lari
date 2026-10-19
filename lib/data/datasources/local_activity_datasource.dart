@@ -1,8 +1,13 @@
 import 'dart:convert';
+import '../backup/activity_identity_aliases.dart';
 
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/activity_model.dart';
+import 'local_equipment_datasource.dart';
+import '../backup/local_data_coordinator.dart';
+import '../backup/snapshot_backup_service.dart';
+import 'local_activity_identity_migration.dart';
 
 /// Transparent proxy around Hive [Box] ensuring that negative integer IDs
 /// and 64-bit integer IDs do not trigger Hive's [Frame.assertKey] error,
@@ -162,6 +167,19 @@ class _SafeBox implements Box {
 }
 
 class LocalActivityDataSource {
+  final LocalDataCoordinator coordinator;
+  final DateTime Function() clock;
+  final SnapshotBackupService? backupService;
+  LocalActivityDataSource({
+    LocalDataCoordinator? coordinator,
+    DateTime Function()? clock,
+    this.backupService,
+  }) : coordinator =
+           coordinator ??
+           backupService?.coordinator ??
+           LocalDataCoordinator.shared,
+       clock = clock ?? DateTime.now;
+
   static const _activitiesBoxName = 'activities';
   static const _hrStreamsBoxName = 'hr_streams';
 
@@ -190,6 +208,69 @@ class LocalActivityDataSource {
     return safeBox;
   }
 
+  Future<void> saveActivities(List<ActivityModel> activities) =>
+      activities.isEmpty
+      ? Future.value()
+      : _write(() => _saveActivities(activities));
+  Future<void> saveActivity(ActivityModel activity) =>
+      _write(() => _saveActivity(activity));
+  Future<void> updateActivity(ActivityModel activity) =>
+      _write(() => _updateActivity(activity));
+  Future<void> updateLocalActivityId(
+    int oldLocalId,
+    ActivityModel updatedModel,
+  ) => _write(() => _updateLocalActivityId(oldLocalId, updatedModel));
+  Future<void> smartMergeActivities(List<ActivityModel> remoteActivities) =>
+      remoteActivities.isEmpty
+      ? Future.value()
+      : _write(() => _smartMergeActivities(remoteActivities));
+  Future<List<ActivityModel>?> getCachedActivities({bool checkTtl = true}) =>
+      coordinator.read(() => _getCachedActivities(checkTtl: checkTtl));
+  Future<List<ActivityModel>> getAllActivities() =>
+      coordinator.read(_getAllActivities);
+  Future<void> saveHeartRateStream(int activityId, List<double> data) =>
+      _write(() => _saveHeartRateStream(activityId, data));
+  Future<Map<int, List<double>>> getCachedHeartRateStreams({
+    bool checkTtl = true,
+  }) => coordinator.read(() => _getCachedHeartRateStreams(checkTtl: checkTtl));
+  Future<void> clearCache() => _write(_clearCache);
+
+  Future<void> _write(Future<void> Function() operation) =>
+      coordinator.write(() async {
+        await operation();
+        final activities = _activitiesBox;
+        final streams = _hrStreamsBox;
+        if (activities != null && activities.isOpen) await activities.flush();
+        if (streams != null && streams.isOpen) await streams.flush();
+      });
+
+  Future<ActivityModel> _assignment(ActivityModel activity) async {
+    final shoeId = activity.shoeId;
+    await _ensureShoe(shoeId);
+    final raw = (await activitiesBox).get(_toKey(activity.id));
+    final old = raw is Map
+        ? ActivityModel.fromJson(
+            jsonDecode(raw['data'] as String) as Map<String, dynamic>,
+          )
+        : null;
+    final changed = old?.shoeId != shoeId;
+    return activity.copyWith(
+      shoeAssignmentModifiedAt: changed
+          ? clock().toUtc()
+          : old?.shoeAssignmentModifiedAt,
+    );
+  }
+
+  Future<void> _ensureShoe(String? shoeId) async {
+    if (shoeId == null) return;
+    final shoes = await LocalEquipmentDataSource(
+      coordinator: coordinator,
+    ).getAll();
+    if (!shoes.any((shoe) => shoe.id == shoeId)) {
+      throw ArgumentError('Activity references a missing shoe.');
+    }
+  }
+
   /// Converts an activity ID to a valid Hive box key.
   /// 32-bit non-negative integers (0 to 0xFFFFFFFF) can be stored directly as int keys,
   /// while negative IDs and 64-bit IDs must be stored as String keys to satisfy Hive constraints.
@@ -200,23 +281,22 @@ class LocalActivityDataSource {
     return id.toString();
   }
 
-  /// Safely removes an entry by ID, checking both int and String keys.
-  Future<void> _deleteByKey(Box box, int id) async {
-    if (id >= 0 && id <= 0xFFFFFFFF) {
-      await box.delete(id);
-    }
-    await box.delete(id.toString());
-  }
+  Map<String, Object?> _identityMetadata(Object? row) =>
+      row is Map && row.containsKey('identity_aliases')
+      ? {'identity_aliases': validatedActivityAliases(row['identity_aliases'])}
+      : {};
 
   /// Saves a batch of activities additively into Hive.
-  Future<void> saveActivities(List<ActivityModel> activities) async {
+  Future<void> _saveActivities(List<ActivityModel> activities) async {
     if (activities.isEmpty) return;
     try {
       final box = await activitiesBox;
       final Map<dynamic, Map<String, dynamic>> entries = {};
       final now = DateTime.now().millisecondsSinceEpoch;
-      for (final activity in activities) {
+      for (final input in activities) {
+        final activity = await _assignment(input);
         entries[_toKey(activity.id)] = {
+          ..._identityMetadata(box.get(_toKey(activity.id))),
           'id': activity.id,
           'data': jsonEncode(activity.toJson()),
           'synced_at': now,
@@ -225,24 +305,31 @@ class LocalActivityDataSource {
       if (entries.isNotEmpty) {
         await box.putAll(entries);
       }
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Saves a single activity into Hive.
-  Future<void> saveActivity(ActivityModel activity) async {
+  Future<void> _saveActivity(ActivityModel activity) async {
+    activity = await _assignment(activity);
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'id': activity.id,
         'data': jsonEncode(activity.toJson()),
         'synced_at': DateTime.now().millisecondsSinceEpoch,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Updates an existing activity, preserving original synced_at timestamp if present.
-  Future<void> updateActivity(ActivityModel activity) async {
+  Future<void> _updateActivity(ActivityModel activity) async {
+    activity = await _assignment(activity);
     try {
       final box = await activitiesBox;
       final key = _toKey(activity.id);
@@ -252,85 +339,78 @@ class LocalActivityDataSource {
           DateTime.now().millisecondsSinceEpoch;
 
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'id': activity.id,
         'data': jsonEncode(activity.toJson()),
         'synced_at': syncedAt,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
-  /// Atomically re-keys a local workout (negative ID) to its new remote Strava ID upon upload.
-  Future<void> updateLocalActivityId(
+  /// Re-key the Activity, stream and check-ins in one recoverable normal edit.
+  Future<void> _updateLocalActivityId(
     int oldLocalId,
     ActivityModel updatedModel,
-  ) async {
-    try {
-      final actBox = await activitiesBox;
-      await _deleteByKey(actBox, oldLocalId);
-      await saveActivity(updatedModel);
-
-      // Re-key associated heart rate stream if one exists
-      final hrBox = await hrStreamsBox;
-      final oldHrKey = _toKey(oldLocalId);
-      final hrEntry = hrBox.get(oldHrKey);
-      if (hrEntry != null) {
-        await _deleteByKey(hrBox, oldLocalId);
-        final newHrKey = _toKey(updatedModel.id);
-        if (hrEntry is Map) {
-          final data = Map<String, dynamic>.from(hrEntry);
-          data['activity_id'] = updatedModel.id;
-          await hrBox.put(newHrKey, data);
-        }
-      }
-    } catch (_) {}
-  }
+  ) => migrateLocalActivityIdentity(
+    backupService ?? SnapshotBackupService(coordinator: coordinator),
+    oldLocalId,
+    updatedModel,
+  );
 
   /// Additively merges remote Strava activities into the local store,
   /// strictly preserving all local-only activities (id < 0) and
   /// retaining any local-only metadata/annotations on matching activities.
-  Future<void> smartMergeActivities(
+  Future<void> _smartMergeActivities(
     List<ActivityModel> remoteActivities,
   ) async {
     if (remoteActivities.isEmpty) return;
-    try {
-      final box = await activitiesBox;
-      final Map<dynamic, Map<String, dynamic>> entries = {};
-      final now = DateTime.now().millisecondsSinceEpoch;
-      for (final remote in remoteActivities) {
-        final key = _toKey(remote.id);
-        final existingRaw = box.get(key);
-        ActivityModel merged = remote;
-        int syncedAt = now;
-        if (existingRaw is Map) {
-          try {
-            final existingModel = ActivityModel.fromJson(
-              jsonDecode(existingRaw['data'] as String),
+    final box = await activitiesBox;
+    final Map<dynamic, Map<String, dynamic>> entries = {};
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (final remote in remoteActivities) {
+      final key = _toKey(remote.id);
+      final existingRaw = box.get(key);
+      ActivityModel merged = remote;
+      int syncedAt = now;
+      if (existingRaw is Map) {
+        try {
+          final existingModel = ActivityModel.fromJson(
+            jsonDecode(existingRaw['data'] as String),
+          );
+          syncedAt = existingRaw['synced_at'] as int? ?? now;
+          merged = merged.copyWith(
+            shoeId: existingModel.shoeAssignmentModifiedAt != null
+                ? existingModel.shoeId
+                : existingModel.shoeId ?? remote.shoeId,
+            shoeAssignmentModifiedAt: existingModel.shoeAssignmentModifiedAt,
+          );
+          if (remote.perceivedExertion == null &&
+              existingModel.perceivedExertion != null) {
+            merged = merged.copyWith(
+              perceivedExertion: existingModel.perceivedExertion,
             );
-            syncedAt = existingRaw['synced_at'] as int? ?? now;
-            if (remote.perceivedExertion == null &&
-                existingModel.perceivedExertion != null) {
-              merged = merged.copyWith(
-                perceivedExertion: existingModel.perceivedExertion,
-              );
-            }
-          } catch (_) {}
-        }
-        entries[key] = {
-          'id': merged.id,
-          'data': jsonEncode(merged.toJson()),
-          'synced_at': syncedAt,
-        };
+          }
+        } catch (_) {}
       }
-      if (entries.isNotEmpty) {
-        await box.putAll(entries);
-      }
-    } catch (_) {}
+      await _ensureShoe(merged.shoeId);
+      entries[key] = {
+        ..._identityMetadata(existingRaw),
+        'id': merged.id,
+        'data': jsonEncode(merged.toJson()),
+        'synced_at': syncedAt,
+      };
+    }
+    if (entries.isNotEmpty) {
+      await box.putAll(entries);
+    }
   }
 
   /// Returns cached activities. Preserved for backwards compatibility with legacy callers
   /// and existing unit tests.
   /// When [checkTtl] is true, returns null if oldest activity is older than 1 hour.
-  Future<List<ActivityModel>?> getCachedActivities({
+  Future<List<ActivityModel>?> _getCachedActivities({
     bool checkTtl = true,
   }) async {
     try {
@@ -355,14 +435,14 @@ class LocalActivityDataSource {
           .map((r) => ActivityModel.fromJson(jsonDecode(r['data'] as String)))
           .toList();
     } catch (_) {
-      return null;
+      rethrow;
     }
   }
 
   /// Permanent Single Source of Truth (SSOT) retrieval with Zero-TTL.
   /// Returns all stored activities sorted chronologically descending (newest first).
   /// Never returns null; returns an empty list if no activities exist.
-  Future<List<ActivityModel>> getAllActivities() async {
+  Future<List<ActivityModel>> _getAllActivities() async {
     try {
       final box = await activitiesBox;
       if (box.isEmpty) return [];
@@ -387,21 +467,24 @@ class LocalActivityDataSource {
   }
 
   /// Saves a heart rate stream for an activity.
-  Future<void> saveHeartRateStream(int activityId, List<double> data) async {
+  Future<void> _saveHeartRateStream(int activityId, List<double> data) async {
     try {
       final box = await hrStreamsBox;
       final key = _toKey(activityId);
       await box.put(key, {
+        ..._identityMetadata(box.get(key)),
         'activity_id': activityId,
         'data': jsonEncode(data),
         'synced_at': DateTime.now().millisecondsSinceEpoch,
       });
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 
   /// Retrieves cached heart rate streams.
   /// When [checkTtl] is true, filters out streams older than 1 hour.
-  Future<Map<int, List<double>>> getCachedHeartRateStreams({
+  Future<Map<int, List<double>>> _getCachedHeartRateStreams({
     bool checkTtl = true,
   }) async {
     try {
@@ -423,7 +506,7 @@ class LocalActivityDataSource {
       }
       return result;
     } catch (_) {
-      return {};
+      rethrow;
     }
   }
 
@@ -432,12 +515,22 @@ class LocalActivityDataSource {
       getCachedHeartRateStreams(checkTtl: false);
 
   /// Clears all stored activities and heart rate streams.
-  Future<void> clearCache() async {
+  Future<void> _clearCache() async {
     try {
+      final feedback = Hive.isBoxOpen('rehab_feedback')
+          ? Hive.box('rehab_feedback')
+          : await Hive.openBox('rehab_feedback');
+      if (feedback.isNotEmpty) {
+        throw StateError(
+          'Cannot clear Activities while Rehab Feedback is linked.',
+        );
+      }
       final boxAct = await activitiesBox;
       final boxHr = await hrStreamsBox;
       await boxAct.clear();
       await boxHr.clear();
-    } catch (_) {}
+    } catch (_) {
+      rethrow;
+    }
   }
 }

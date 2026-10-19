@@ -21,7 +21,8 @@ export PATH="$FLUTTER_DIR/bin:$PATH"
 
 flutter config --enable-web --no-analytics
 
-DART_DEFINES=""
+APP_VERSION="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)"
+DART_DEFINES="--dart-define=APP_VERSION=$APP_VERSION"
 [ -n "$STRAVA_CLIENT_ID" ] && DART_DEFINES="$DART_DEFINES --dart-define=STRAVA_CLIENT_ID=$STRAVA_CLIENT_ID"
 [ -n "$STRAVA_CLIENT_SECRET" ] && DART_DEFINES="$DART_DEFINES --dart-define=STRAVA_CLIENT_SECRET=$STRAVA_CLIENT_SECRET"
 [ -n "$STRAVA_REDIRECT_URI" ] && DART_DEFINES="$DART_DEFINES --dart-define=STRAVA_REDIRECT_URI=$STRAVA_REDIRECT_URI"

@@ -25,6 +25,10 @@ _ActivityModel _$ActivityModelFromJson(Map<String, dynamic> json) =>
       hasHeartrate: json['has_heartrate'] as bool? ?? false,
       workoutType: (json['workout_type'] as num?)?.toInt(),
       perceivedExertion: (json['perceived_exertion'] as num?)?.toDouble(),
+      shoeId: json['shoe_id'] as String?,
+      shoeAssignmentModifiedAt: json['shoe_assignment_modified_at'] == null
+          ? null
+          : DateTime.parse(json['shoe_assignment_modified_at'] as String),
     );
 
 Map<String, dynamic> _$ActivityModelToJson(_ActivityModel instance) =>
@@ -46,4 +50,7 @@ Map<String, dynamic> _$ActivityModelToJson(_ActivityModel instance) =>
       'has_heartrate': instance.hasHeartrate,
       'workout_type': instance.workoutType,
       'perceived_exertion': instance.perceivedExertion,
+      'shoe_id': instance.shoeId,
+      'shoe_assignment_modified_at': instance.shoeAssignmentModifiedAt
+          ?.toIso8601String(),
     };

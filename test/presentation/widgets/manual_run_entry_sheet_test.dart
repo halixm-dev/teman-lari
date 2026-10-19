@@ -1,3 +1,4 @@
+import 'package:teman_lari/presentation/providers/equipment_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -96,6 +97,7 @@ void main() {
       return ProviderScope(
         overrides: [
           activityRepositoryProvider.overrideWithValue(fakeRepo),
+          equipmentProvider.overrideWith((ref) async => []),
           runningStatsProvider.overrideWith((ref) async => null),
         ],
         child: MaterialApp(

@@ -25,6 +25,8 @@ abstract class ActivityModel with _$ActivityModel {
     @Default(false) bool hasHeartrate,
     int? workoutType,
     double? perceivedExertion,
+    String? shoeId,
+    DateTime? shoeAssignmentModifiedAt,
   }) = _ActivityModel;
 
   factory ActivityModel.fromJson(Map<String, dynamic> json) =>

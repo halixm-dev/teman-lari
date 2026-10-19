@@ -5,6 +5,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/utils/responsive.dart';
 import 'data/datasources/preferences_storage.dart';
+import 'data/backup/snapshot_backup_service.dart';
+import 'presentation/widgets/local_recovery_gate.dart';
+import 'presentation/widgets/local_backup_recovery_observer.dart';
+import 'presentation/widgets/tracked_workout_guard.dart';
 import 'domain/entities/training_plan.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/core_provider.dart';
@@ -42,8 +46,9 @@ GoRouter createRouter({
       GoRoute(path: '/plan', builder: (context, state) => const PlanScreen()),
       GoRoute(
         path: '/run-session',
-        builder: (context, state) =>
-            RunSessionScreen(day: state.extra as TrainingDay),
+        builder: (context, state) => TrackedWorkoutGuard(
+          child: RunSessionScreen(day: state.extra as TrainingDay),
+        ),
       ),
       GoRoute(
         path: '/settings',
@@ -70,7 +75,15 @@ GoRouter createRouter({
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
-  runApp(const ProviderScope(child: TemanLariApp()));
+  runApp(
+    LocalRecoveryGate(
+      initialize: SnapshotBackupService.shared.initialize,
+      recoveryRequired: SnapshotBackupService.shared.coordinator.recoveryState,
+      ready: () => const ProviderScope(
+        child: LocalBackupRecoveryObserver(child: TemanLariApp()),
+      ),
+    ),
+  );
 }
 
 class TemanLariApp extends ConsumerStatefulWidget {
@@ -156,61 +169,94 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = Responsive.isDesktop(context);
-
-    if (isDesktop) {
-      return Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (index) {
-                setState(() => _currentIndex = index);
-              },
-              labelType: NavigationRailLabelType.all,
-              leading: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: ImageIcon(
-                  const AssetImage('assets/icons/Icon.png'),
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 48,
-                ),
-              ),
-              destinations: const [
-                NavigationRailDestination(
-                  icon: Icon(Icons.dashboard),
-                  label: Text('Dashboard'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.analytics),
-                  label: Text('Analysis'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.calendar_today),
-                  label: Text('Plan'),
-                ),
-                NavigationRailDestination(
-                  icon: Icon(Icons.settings),
-                  label: Text('Settings'),
-                ),
-              ],
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: _screens[_currentIndex]),
-          ],
-        ),
+    if (Responsive.isDesktop(context)) {
+      return _DesktopNavigationScaffold(
+        currentIndex: _currentIndex,
+        screens: _screens,
+        onDestinationSelected: (index) => setState(() => _currentIndex = index),
       );
     }
+    return _MobileNavigationScaffold(
+      currentIndex: _currentIndex,
+      screens: _screens,
+      onDestinationSelected: (index) => setState(() => _currentIndex = index),
+    );
+  }
+}
 
+class _DesktopNavigationScaffold extends StatelessWidget {
+  final int currentIndex;
+  final List<Widget> screens;
+  final ValueChanged<int> onDestinationSelected;
+
+  const _DesktopNavigationScaffold({
+    required this.currentIndex,
+    required this.screens,
+    required this.onDestinationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: currentIndex,
+            onDestinationSelected: onDestinationSelected,
+            labelType: NavigationRailLabelType.all,
+            leading: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ImageIcon(
+                const AssetImage('assets/icons/Icon.png'),
+                color: Theme.of(context).colorScheme.primary,
+                size: 48,
+              ),
+            ),
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.dashboard),
+                label: Text('Dashboard'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.analytics),
+                label: Text('Analysis'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.calendar_today),
+                label: Text('Plan'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.settings),
+                label: Text('Settings'),
+              ),
+            ],
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(child: screens[currentIndex]),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileNavigationScaffold extends StatelessWidget {
+  final int currentIndex;
+  final List<Widget> screens;
+  final ValueChanged<int> onDestinationSelected;
+
+  const _MobileNavigationScaffold({
+    required this.currentIndex,
+    required this.screens,
+    required this.onDestinationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: screens[currentIndex],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        selectedIndex: currentIndex,
+        onDestinationSelected: onDestinationSelected,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard),

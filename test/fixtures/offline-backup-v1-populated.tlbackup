@@ -1,0 +1,235 @@
+{
+  "product": "teman_lari",
+  "schema_version": 1,
+  "snapshot_id": "portable-populated-v1",
+  "created_at": "2026-10-14T00:00:00Z",
+  "app_version": "1.0.0+1",
+  "counts": {
+    "training_plan_state": 1,
+    "activities": 2,
+    "equipment": 2,
+    "heart_rate_streams": 1,
+    "rehab_feedback": 1,
+    "profile": 5
+  },
+  "data": {
+    "profile": {
+      "athlete_name": {
+        "value": "Portable Runner",
+        "modified_at": "2026-10-14T00:00:00Z"
+      },
+      "date_of_birth": {
+        "value": "1940-02-29",
+        "modified_at": null
+      },
+      "resting_hr": {
+        "value": null,
+        "modified_at": null
+      },
+      "max_hr": {
+        "value": null,
+        "modified_at": null
+      },
+      "threshold_pace_sec": {
+        "value": null,
+        "modified_at": null
+      }
+    },
+    "activities": [
+      {
+        "perceived_exertion": 4.5,
+        "name": "Historical run",
+        "type": "Run",
+        "moving_time": 600,
+        "start_date": "1990-01-02T03:04:05.123456Z",
+        "elapsed_time": 650,
+        "suffer_score": null,
+        "average_cadence": 80.5,
+        "is_local": true,
+        "total_elevation_gain": 10.5,
+        "distance": 1234.567,
+        "average_heartrate": 130.25,
+        "id": "-7",
+        "max_heartrate": 145,
+        "workout_type": null,
+        "has_heartrate": true,
+        "max_speed": 3.5,
+        "average_speed": 2.05
+      },
+      {
+        "perceived_exertion": 4.5,
+        "name": "Historical ride",
+        "type": "Ride",
+        "moving_time": 600,
+        "has_heartrate": true,
+        "start_date": "1980-12-31T23:00:00Z",
+        "elapsed_time": 650,
+        "suffer_score": null,
+        "is_local": false,
+        "average_cadence": 80.5,
+        "distance": 1234.567,
+        "total_elevation_gain": 10.5,
+        "average_speed": 2.05,
+        "id": "42",
+        "max_heartrate": 145,
+        "workout_type": null,
+        "max_speed": 3.5,
+        "average_heartrate": 130.25
+      }
+    ],
+    "heart_rate_streams": [
+      {
+        "samples": [
+          130.25,
+          131.75
+        ],
+        "activity_id": "-7"
+      }
+    ],
+    "training_plan_state": {
+      "week_in_cycle": {
+        "value": 1,
+        "modified_at": "2026-10-14T00:00:00Z"
+      },
+      "plans": [
+        {
+          "plan": {
+            "days": [
+              {
+                "pace_target": {
+                  "slowest_pace": 360.125,
+                  "label": "Steady",
+                  "fastest_pace": 300.5
+                },
+                "run_walk_phase": {
+                  "type": "phase1",
+                  "run_seconds": 60,
+                  "total_duration_minutes": 30,
+                  "label": "Run walk",
+                  "walk_seconds": 90
+                },
+                "date": "2026-10-14",
+                "cool_down_minutes": 5,
+                "type": "intervals",
+                "intervals": [
+                  {
+                    "type": "work",
+                    "duration": 60.25
+                  },
+                  {
+                    "type": "recovery",
+                    "duration": 30.5
+                  }
+                ],
+                "estimated_duration": 1800.123456,
+                "heart_rate_target": {
+                  "max_bpm": 160,
+                  "min_bpm": 120,
+                  "label": "Aerobic",
+                  "zone_number": 3
+                },
+                "target_minutes": 30,
+                "warm_up_minutes": 5,
+                "description": "Six repeats"
+              }
+            ],
+            "week_in_cycle": 1,
+            "description": "Portable fixture",
+            "goal": "Preserved training",
+            "cycle_phase": "baseBuilding",
+            "start_date": "2026-10-14"
+          },
+          "id": "plan-1"
+        }
+      ],
+      "cycle_start_date": {
+        "value": "2026-10-14T00:00:00Z",
+        "modified_at": "2026-10-14T00:00:00Z"
+      },
+      "configuration": {
+        "build_week_volume_increment": 0.1,
+        "injury_gap_days": 14,
+        "short_gap_days": 3,
+        "long_run_fraction": 0.3,
+        "beginner_max_runs_per_week": 3,
+        "advanced_interval_min": 42,
+        "easy_fraction": 0.2,
+        "max_weekly_minutes_scale_up": 900.0,
+        "long_run_max_cap": 120,
+        "long_run_min_cap": 20,
+        "long_run_multiplier": 1.5,
+        "intermediate_run_count": 22,
+        "max_weekly_minutes": 600.0,
+        "optimal_tsb_threshold": 5.0,
+        "return_start_fraction": 0.55,
+        "tired_tsb_threshold": -10.0,
+        "intermediate_interval_min": 36,
+        "min_easy_run_minutes": 20,
+        "min_acwr_days": 28,
+        "stale_activity_days": 90,
+        "cycle_length_weeks": 4,
+        "return_easy_only_weeks": 1,
+        "deload_long_run_fraction": 0.5,
+        "beginner_weekly_km": 20.0,
+        "min_run_duration": 10,
+        "return_weekly_increase_cap": 0.1,
+        "aerobic_fitness_score": 30.0,
+        "advanced_run_count": 50,
+        "return_ramp_weeks": 3,
+        "return_gap_days": 3,
+        "beginner_run_count": 15,
+        "beginner_min_easy_minutes": 10,
+        "danger_tsb_threshold": -20.0,
+        "min_weekly_minutes": 60.0,
+        "long_gap_days": 7,
+        "continuous_run_threshold": 15,
+        "base_building_run_count": 10,
+        "beginner_interval_min": 30,
+        "fresh_form_score": 10.0,
+        "deload_volume_fraction": 0.5,
+        "tempo_fraction": 0.15,
+        "fatigued_tsb_threshold": -15.0,
+        "beginner_weekly_min_target": 45,
+        "advanced_weekly_km": 50.0
+      },
+      "active_plan_id": "plan-1",
+      "modified_at": "2026-10-14T00:00:00Z"
+    },
+    "equipment": {
+      "shoes": [
+        {
+          "name": "Daily pair",
+          "category": "daily_trainer",
+          "id": "shoe-1",
+          "created_at": "2020-01-01T00:00:00Z",
+          "performance_target_meters": null,
+          "modified_at": null,
+          "foam_chemistry": "traditional_eva",
+          "lifecycle_target_meters": 600000
+        }
+      ],
+      "activity_assignments": [
+        {
+          "shoe_id": "shoe-1",
+          "activity_id": "-7",
+          "modified_at": "2026-10-14T00:00:00Z"
+        }
+      ]
+    },
+    "rehab_feedback": {
+      "records": [
+        {
+          "morning_after_pain": 1.5,
+          "morning_stiffness": false,
+          "post_run_pain": 2.5,
+          "id": "feedback-1",
+          "injury_site": "achilles",
+          "post_run_recorded_at": "1990-01-02T03:20:00Z",
+          "morning_after_recorded_at": "1990-01-03T07:00:00Z",
+          "modified_at": "1990-01-03T07:00:00Z",
+          "activity_id": "-7"
+        }
+      ]
+    }
+  }
+}

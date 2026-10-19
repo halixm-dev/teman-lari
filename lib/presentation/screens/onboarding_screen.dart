@@ -316,36 +316,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   isDark: isDark,
                 ),
               ),
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: (page) => setState(() => _currentStep = page),
-                  children: [
-                    _StepOneWelcomeView(
-                      isDark: isDark,
-                      onGetStarted: () => _goToStep(1),
-                    ),
-                    _StepTwoDemographicView(
-                      isDark: isDark,
-                      nameController: _nameController,
-                      dobController: _dobController,
-                      ageController: _ageController,
-                      dobError: _dobError,
-                      estimatedAge: _estimatedAge,
-                      estimatedMaxHr: _estimatedMaxHr,
-                      onPickDate: () => _pickDate(context),
-                      onBack: () => _goToStep(0),
-                      onSkip: _skipOnboarding,
-                      onComplete: _completeSetup,
-                    ),
-                  ],
-                ),
-              ),
+              Expanded(child: _buildPageView(isDark)),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPageView(bool isDark) {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      onPageChanged: (page) => setState(() => _currentStep = page),
+      children: [
+        _StepOneWelcomeView(isDark: isDark, onGetStarted: () => _goToStep(1)),
+        _StepTwoDemographicView(
+          isDark: isDark,
+          nameController: _nameController,
+          dobController: _dobController,
+          ageController: _ageController,
+          dobError: _dobError,
+          estimatedAge: _estimatedAge,
+          estimatedMaxHr: _estimatedMaxHr,
+          onPickDate: () => _pickDate(context),
+          onBack: () => _goToStep(0),
+          onSkip: _skipOnboarding,
+          onComplete: _completeSetup,
+        ),
+      ],
     );
   }
 }
@@ -414,8 +413,6 @@ class _StepOneWelcomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Column(
       children: [
         Expanded(
@@ -427,96 +424,135 @@ class _StepOneWelcomeView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isDark
-                        ? AppColors.brandOrange.withValues(alpha: 0.15)
-                        : AppColors.brandOrangeTint,
-                  ),
-                  child: const Icon(
-                    Icons.directions_run_rounded,
-                    size: 38,
-                    color: AppColors.brandOrange,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.space3),
-                Text(
-                  'Welcome to Teman Lari',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.gray900,
-                    letterSpacing: -0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: AppSpacing.space1),
-                Text(
-                  'Your offline-first running companion built for movement, data-driven insights, and personal growth.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.gray700,
-                    height: 1.4,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+                _WelcomeHeroHeader(isDark: isDark),
                 const SizedBox(height: AppSpacing.space4),
-                const _ValuePropositionCard(
-                  key: ValueKey('value_card_offline_tracking'),
-                  icon: Icons.sensors_rounded,
-                  title: 'Offline-First Tracking',
-                  description:
-                      'Permanent zero-TTL local database. Track runs anywhere with GPS and sensors without internet connectivity.',
-                ),
-                const SizedBox(height: AppSpacing.space2),
-                const _ValuePropositionCard(
-                  key: ValueKey('value_card_analytics'),
-                  icon: Icons.insights_rounded,
-                  title: 'Autonomous On-Device Analytics',
-                  description:
-                      'On-device physiological engine computing ATL (Fatigue), CTL (Fitness), and TSB (Form) kept 100% private.',
-                ),
-                const SizedBox(height: AppSpacing.space2),
-                const _ValuePropositionCard(
-                  key: ValueKey('value_card_plans'),
-                  icon: Icons.calendar_month_rounded,
-                  title: 'Adaptive Plan Generation',
-                  description:
-                      'Dynamic periodized training schedules that adjust directly to runner workload and fitness level.',
-                ),
+                const _ValueCardsSection(),
               ],
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.space6,
-            vertical: AppSpacing.space3,
+        _GetStartedButton(onGetStarted: onGetStarted),
+      ],
+    );
+  }
+}
+
+class _WelcomeHeroHeader extends StatelessWidget {
+  final bool isDark;
+
+  const _WelcomeHeroHeader({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark
+                ? AppColors.brandOrange.withValues(alpha: 0.15)
+                : AppColors.brandOrangeTint,
           ),
-          child: FilledButton.icon(
-            key: const ValueKey('get_started_button'),
-            onPressed: onGetStarted,
-            icon: const Icon(Icons.arrow_forward_rounded),
-            label: const Text('Get Started'),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.brandOrange,
-              foregroundColor: AppColors.white,
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              ),
-              textStyle: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          child: const Icon(
+            Icons.directions_run_rounded,
+            size: 38,
+            color: AppColors.brandOrange,
           ),
         ),
+        const SizedBox(height: AppSpacing.space3),
+        Text(
+          'Welcome to Teman Lari',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.gray900,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpacing.space1),
+        Text(
+          'Your offline-first running companion built for movement, data-driven insights, and personal growth.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+            height: 1.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
       ],
+    );
+  }
+}
+
+class _ValueCardsSection extends StatelessWidget {
+  const _ValueCardsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        _ValuePropositionCard(
+          key: ValueKey('value_card_offline_tracking'),
+          icon: Icons.sensors_rounded,
+          title: 'Offline-First Tracking',
+          description:
+              'Permanent zero-TTL local database. Track runs anywhere with GPS and sensors without internet connectivity.',
+        ),
+        SizedBox(height: AppSpacing.space2),
+        _ValuePropositionCard(
+          key: ValueKey('value_card_analytics'),
+          icon: Icons.insights_rounded,
+          title: 'Autonomous On-Device Analytics',
+          description:
+              'On-device physiological engine computing ATL (Fatigue), CTL (Fitness), and TSB (Form) kept 100% private.',
+        ),
+        SizedBox(height: AppSpacing.space2),
+        _ValuePropositionCard(
+          key: ValueKey('value_card_plans'),
+          icon: Icons.calendar_month_rounded,
+          title: 'Adaptive Plan Generation',
+          description:
+              'Dynamic periodized training schedules that adjust directly to runner workload and fitness level.',
+        ),
+      ],
+    );
+  }
+}
+
+class _GetStartedButton extends StatelessWidget {
+  final VoidCallback onGetStarted;
+
+  const _GetStartedButton({required this.onGetStarted});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.space6,
+        vertical: AppSpacing.space3,
+      ),
+      child: FilledButton.icon(
+        key: const ValueKey('get_started_button'),
+        onPressed: onGetStarted,
+        icon: const Icon(Icons.arrow_forward_rounded),
+        label: const Text('Get Started'),
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.brandOrange,
+          foregroundColor: AppColors.white,
+          minimumSize: const Size.fromHeight(50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          ),
+          textStyle: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -556,47 +592,49 @@ class _ValuePropositionCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.brandOrange.withValues(alpha: 0.15)
-                    : AppColors.brandOrangeTint,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              ),
-              child: Icon(icon, color: AppColors.brandOrange, size: 22),
-            ),
+            _buildIconBadge(isDark),
             const SizedBox(width: AppSpacing.space3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.gray900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s4),
-                  Text(
-                    description,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.gray700,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            Expanded(child: _buildTextColumn(theme, isDark)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildIconBadge(bool isDark) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.brandOrange.withValues(alpha: 0.15)
+            : AppColors.brandOrangeTint,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      child: Icon(icon, color: AppColors.brandOrange, size: 22),
+    );
+  }
+
+  Widget _buildTextColumn(ThemeData theme, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.gray900,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          description,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+            height: 1.35,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -843,97 +881,148 @@ class _TanakaPreviewCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.space3),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.brandOrange.withValues(alpha: 0.2)
-                    : AppColors.brandOrangeTint,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              ),
-              child: const Icon(
-                Icons.favorite_rounded,
+            _TanakaHeartIcon(isDark: isDark),
+            const SizedBox(width: AppSpacing.space3),
+            Expanded(child: _buildDetailsColumn(theme)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsColumn(ThemeData theme) {
+    final maxHr = estimatedMaxHr;
+    final age = estimatedAge;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Estimated Max Heart Rate',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.textPrimaryDark : AppColors.gray900,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s4),
+        if (maxHr != null && age != null)
+          _TanakaActiveDisplay(
+            estimatedMaxHr: maxHr,
+            estimatedAge: age,
+            isDark: isDark,
+          )
+        else
+          _TanakaEmptyDisplay(isDark: isDark),
+      ],
+    );
+  }
+}
+
+class _TanakaHeartIcon extends StatelessWidget {
+  final bool isDark;
+
+  const _TanakaHeartIcon({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: isDark
+            ? AppColors.brandOrange.withValues(alpha: 0.2)
+            : AppColors.brandOrangeTint,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      child: const Icon(
+        Icons.favorite_rounded,
+        color: AppColors.brandOrange,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _TanakaActiveDisplay extends StatelessWidget {
+  final int estimatedMaxHr;
+  final int estimatedAge;
+  final bool isDark;
+
+  const _TanakaActiveDisplay({
+    required this.estimatedMaxHr,
+    required this.estimatedAge,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '$estimatedMaxHr bpm',
+              key: const ValueKey('tanaka_max_hr_text'),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontFamily: AppTypography.monoFamily,
+                fontWeight: FontWeight.w800,
                 color: AppColors.brandOrange,
-                size: 24,
               ),
             ),
-            const SizedBox(width: AppSpacing.space3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Estimated Max Heart Rate',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.gray900,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s4),
-                  if (estimatedMaxHr != null && estimatedAge != null) ...[
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          '$estimatedMaxHr bpm',
-                          key: const ValueKey('tanaka_max_hr_text'),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontFamily: AppTypography.monoFamily,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.brandOrange,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.space2),
-                        Text(
-                          '(Age $estimatedAge)',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.gray700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.s4),
-                    Text(
-                      'Tanaka formula: 208 - (0.7 × $estimatedAge) = $estimatedMaxHr bpm',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.gray700,
-                      ),
-                    ),
-                  ] else ...[
-                    Text(
-                      '-- bpm',
-                      key: const ValueKey('tanaka_max_hr_text'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontFamily: AppTypography.monoFamily,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.gray700,
-                      ),
-                    ),
-                    Text(
-                      'Enter birth date to estimate Max HR via Tanaka formula',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.gray700,
-                      ),
-                    ),
-                  ],
-                ],
+            const SizedBox(width: AppSpacing.space2),
+            Text(
+              '(Age $estimatedAge)',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: AppSpacing.s4),
+        Text(
+          'Tanaka formula: 208 - (0.7 × $estimatedAge) = $estimatedMaxHr bpm',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TanakaEmptyDisplay extends StatelessWidget {
+  final bool isDark;
+
+  const _TanakaEmptyDisplay({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '-- bpm',
+          key: const ValueKey('tanaka_max_hr_text'),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontFamily: AppTypography.monoFamily,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+          ),
+        ),
+        Text(
+          'Enter birth date to estimate Max HR via Tanaka formula',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: isDark ? AppColors.textSecondaryDark : AppColors.gray700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1004,18 +1093,7 @@ class _StepTwoActions extends StatelessWidget {
       ),
       child: Row(
         children: [
-          OutlinedButton.icon(
-            key: const ValueKey('onboarding_back_button'),
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text('Back'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(90, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              ),
-            ),
-          ),
+          _buildBackButton(),
           const SizedBox(width: AppSpacing.space2),
           TextButton(
             key: const ValueKey('footer_skip_button'),
@@ -1023,26 +1101,43 @@ class _StepTwoActions extends StatelessWidget {
             child: const Text('Skip'),
           ),
           const SizedBox(width: AppSpacing.space2),
-          Expanded(
-            child: FilledButton.icon(
-              key: const ValueKey('complete_onboarding_button'),
-              onPressed: onComplete,
-              icon: const Icon(Icons.check_rounded),
-              label: const Text('Complete Setup'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.brandOrange,
-                foregroundColor: AppColors.white,
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                ),
-                textStyle: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+          Expanded(child: _buildCompleteButton(theme)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBackButton() {
+    return OutlinedButton.icon(
+      key: const ValueKey('onboarding_back_button'),
+      onPressed: onBack,
+      icon: const Icon(Icons.arrow_back_rounded),
+      label: const Text('Back'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(90, 50),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompleteButton(ThemeData theme) {
+    return FilledButton.icon(
+      key: const ValueKey('complete_onboarding_button'),
+      onPressed: onComplete,
+      icon: const Icon(Icons.check_rounded),
+      label: const Text('Complete Setup'),
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.brandOrange,
+        foregroundColor: AppColors.white,
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        ),
+        textStyle: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

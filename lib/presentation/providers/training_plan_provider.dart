@@ -1,4 +1,8 @@
-import 'dart:isolate';
+import 'dart:convert';
+import '../../data/backup/snapshot_backup_service.dart';
+import '../../data/backup/archive/training_plan_config_archive.dart';
+import '../../domain/entities/activity.dart';
+import 'backup_provider.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -42,28 +46,69 @@ GeneratePlanUseCase generatePlanUseCase(Ref ref) {
 @riverpod
 Future<TrainingPlan> trainingPlan(Ref ref) async {
   final activities = await ref.watch(activitiesProvider.future);
-  final weekInCycle = await ref.watch(weekInCycleProvider.future);
+  final week = await ref.watch(weekInCycleProvider.future);
   final prefs = await ref.watch(hrPreferencesProvider.future);
-  final generateUseCase = ref.read(generatePlanUseCaseProvider);
-
-  return kIsWeb
-      ? generateUseCase.generate(
-          activities,
-          weekInCycle: weekInCycle,
-          userMaxHr: prefs.maxHr,
-          userRestingHr: prefs.restingHr,
-          userThresholdPaceSeconds: prefs.thresholdPaceSeconds,
-        )
-      : await Isolate.run(
-          () => generateUseCase.generate(
-            activities,
-            weekInCycle: weekInCycle,
-            userMaxHr: prefs.maxHr,
-            userRestingHr: prefs.restingHr,
-            userThresholdPaceSeconds: prefs.thresholdPaceSeconds,
-          ),
-        );
+  final config = ref.watch(trainingPlanConfigProvider);
+  final base = ref.read(generatePlanUseCaseProvider);
+  final service = ref.read(snapshotBackupServiceProvider);
+  final inputs = jsonEncode([
+    activities.map(_planActivityInputs).toList(),
+    week,
+    prefs.maxHr,
+    prefs.restingHr,
+    prefs.thresholdPaceSeconds,
+    TrainingPlanConfigArchive.fromDomain(config).toJson(),
+  ]);
+  return service.resolveTrainingPlan(
+    inputs: inputs,
+    configuration: config,
+    generate: (effectiveConfig) async {
+      final useCase = GeneratePlanUseCase(
+        analyzeRuns: ref.read(analyzeRunsUseCaseProvider),
+        config: effectiveConfig,
+        sequenceStrategy: base.sequenceStrategy,
+        descriptions: base.descriptions,
+      );
+      final plan = await compute(_generatePlan, (
+        useCase,
+        activities,
+        week,
+        prefs.maxHr,
+        prefs.restingHr,
+        prefs.thresholdPaceSeconds,
+      ));
+      if (!ref.mounted) throw StateError('Training Plan inputs changed.');
+      return plan;
+    },
+  );
 }
+
+TrainingPlan _generatePlan(
+  (GeneratePlanUseCase, List<Activity>, int, int?, int?, int?) inputs,
+) => inputs.$1.generate(
+  inputs.$2,
+  weekInCycle: inputs.$3,
+  userMaxHr: inputs.$4,
+  userRestingHr: inputs.$5,
+  userThresholdPaceSeconds: inputs.$6,
+);
+
+List<Object?> _planActivityInputs(Activity activity) => [
+  activity.id,
+  activity.type.name,
+  activity.date.toUtc().toIso8601String(),
+  activity.distanceKm,
+  activity.movingTime.inMicroseconds,
+  activity.pace.inMicroseconds,
+  activity.avgHeartRate,
+  activity.maxHeartRate,
+  activity.elevationGainM,
+  activity.avgCadence,
+  activity.sufferScore,
+  activity.trainingLoad.name,
+  activity.heartRateData,
+  activity.perceivedExertion,
+];
 
 @riverpod
 class WeekInCycleNotifier extends _$WeekInCycleNotifier {
@@ -73,10 +118,8 @@ class WeekInCycleNotifier extends _$WeekInCycleNotifier {
     final cycleStart = await prefs.getCycleStartDate();
     final daysSinceStart = DateTime.now().difference(cycleStart).inDays;
 
-    if (daysSinceStart < 0) {
-      await prefs.setCycleStartDate(DateTime.now());
-      return 0;
-    }
+    // A future imported cycle is still saved state; reads never reset it.
+    if (daysSinceStart < 0) return 0;
     return daysSinceStart ~/ 7;
   }
 
@@ -87,8 +130,11 @@ class WeekInCycleNotifier extends _$WeekInCycleNotifier {
   }
 
   Future<void> resetCycle() async {
-    final prefs = ref.read(preferencesStorageProvider);
-    await prefs.setCycleStartDate(DateTime.now());
+    await ref
+        .read(snapshotBackupServiceProvider)
+        .resetTrainingCycle(DateTime.now());
+    ref.invalidate(cycleStartDateProvider);
+    ref.invalidate(trainingPlanProvider);
     ref.invalidateSelf();
   }
 }

@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$ActivityModel {
 
- int get id; String get name; String get type; double get distance; int get movingTime; int get elapsedTime; double get totalElevationGain; String get startDate; double get averageSpeed; double get maxSpeed; double? get averageHeartrate; double? get maxHeartrate; double? get averageCadence; int? get sufferScore; bool get hasHeartrate; int? get workoutType; double? get perceivedExertion;
+ int get id; String get name; String get type; double get distance; int get movingTime; int get elapsedTime; double get totalElevationGain; String get startDate; double get averageSpeed; double get maxSpeed; double? get averageHeartrate; double? get maxHeartrate; double? get averageCadence; int? get sufferScore; bool get hasHeartrate; int? get workoutType; double? get perceivedExertion; String? get shoeId; DateTime? get shoeAssignmentModifiedAt;
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $ActivityModelCopyWith<ActivityModel> get copyWith => _$ActivityModelCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ActivityModel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.movingTime, movingTime) || other.movingTime == movingTime)&&(identical(other.elapsedTime, elapsedTime) || other.elapsedTime == elapsedTime)&&(identical(other.totalElevationGain, totalElevationGain) || other.totalElevationGain == totalElevationGain)&&(identical(other.startDate, startDate) || other.startDate == startDate)&&(identical(other.averageSpeed, averageSpeed) || other.averageSpeed == averageSpeed)&&(identical(other.maxSpeed, maxSpeed) || other.maxSpeed == maxSpeed)&&(identical(other.averageHeartrate, averageHeartrate) || other.averageHeartrate == averageHeartrate)&&(identical(other.maxHeartrate, maxHeartrate) || other.maxHeartrate == maxHeartrate)&&(identical(other.averageCadence, averageCadence) || other.averageCadence == averageCadence)&&(identical(other.sufferScore, sufferScore) || other.sufferScore == sufferScore)&&(identical(other.hasHeartrate, hasHeartrate) || other.hasHeartrate == hasHeartrate)&&(identical(other.workoutType, workoutType) || other.workoutType == workoutType)&&(identical(other.perceivedExertion, perceivedExertion) || other.perceivedExertion == perceivedExertion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ActivityModel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.movingTime, movingTime) || other.movingTime == movingTime)&&(identical(other.elapsedTime, elapsedTime) || other.elapsedTime == elapsedTime)&&(identical(other.totalElevationGain, totalElevationGain) || other.totalElevationGain == totalElevationGain)&&(identical(other.startDate, startDate) || other.startDate == startDate)&&(identical(other.averageSpeed, averageSpeed) || other.averageSpeed == averageSpeed)&&(identical(other.maxSpeed, maxSpeed) || other.maxSpeed == maxSpeed)&&(identical(other.averageHeartrate, averageHeartrate) || other.averageHeartrate == averageHeartrate)&&(identical(other.maxHeartrate, maxHeartrate) || other.maxHeartrate == maxHeartrate)&&(identical(other.averageCadence, averageCadence) || other.averageCadence == averageCadence)&&(identical(other.sufferScore, sufferScore) || other.sufferScore == sufferScore)&&(identical(other.hasHeartrate, hasHeartrate) || other.hasHeartrate == hasHeartrate)&&(identical(other.workoutType, workoutType) || other.workoutType == workoutType)&&(identical(other.perceivedExertion, perceivedExertion) || other.perceivedExertion == perceivedExertion)&&(identical(other.shoeId, shoeId) || other.shoeId == shoeId)&&(identical(other.shoeAssignmentModifiedAt, shoeAssignmentModifiedAt) || other.shoeAssignmentModifiedAt == shoeAssignmentModifiedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,distance,movingTime,elapsedTime,totalElevationGain,startDate,averageSpeed,maxSpeed,averageHeartrate,maxHeartrate,averageCadence,sufferScore,hasHeartrate,workoutType,perceivedExertion);
+int get hashCode => Object.hashAll([runtimeType,id,name,type,distance,movingTime,elapsedTime,totalElevationGain,startDate,averageSpeed,maxSpeed,averageHeartrate,maxHeartrate,averageCadence,sufferScore,hasHeartrate,workoutType,perceivedExertion,shoeId,shoeAssignmentModifiedAt]);
 
 @override
 String toString() {
-  return 'ActivityModel(id: $id, name: $name, type: $type, distance: $distance, movingTime: $movingTime, elapsedTime: $elapsedTime, totalElevationGain: $totalElevationGain, startDate: $startDate, averageSpeed: $averageSpeed, maxSpeed: $maxSpeed, averageHeartrate: $averageHeartrate, maxHeartrate: $maxHeartrate, averageCadence: $averageCadence, sufferScore: $sufferScore, hasHeartrate: $hasHeartrate, workoutType: $workoutType, perceivedExertion: $perceivedExertion)';
+  return 'ActivityModel(id: $id, name: $name, type: $type, distance: $distance, movingTime: $movingTime, elapsedTime: $elapsedTime, totalElevationGain: $totalElevationGain, startDate: $startDate, averageSpeed: $averageSpeed, maxSpeed: $maxSpeed, averageHeartrate: $averageHeartrate, maxHeartrate: $maxHeartrate, averageCadence: $averageCadence, sufferScore: $sufferScore, hasHeartrate: $hasHeartrate, workoutType: $workoutType, perceivedExertion: $perceivedExertion, shoeId: $shoeId, shoeAssignmentModifiedAt: $shoeAssignmentModifiedAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $ActivityModelCopyWith<$Res>  {
   factory $ActivityModelCopyWith(ActivityModel value, $Res Function(ActivityModel) _then) = _$ActivityModelCopyWithImpl;
 @useResult
 $Res call({
- int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion
+ int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
 });
 
 
@@ -65,7 +65,7 @@ class _$ActivityModelCopyWithImpl<$Res>
 
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -84,7 +84,9 @@ as double?,sufferScore: freezed == sufferScore ? _self.sufferScore : sufferScore
 as int?,hasHeartrate: null == hasHeartrate ? _self.hasHeartrate : hasHeartrate // ignore: cast_nullable_to_non_nullable
 as bool,workoutType: freezed == workoutType ? _self.workoutType : workoutType // ignore: cast_nullable_to_non_nullable
 as int?,perceivedExertion: freezed == perceivedExertion ? _self.perceivedExertion : perceivedExertion // ignore: cast_nullable_to_non_nullable
-as double?,
+as double?,shoeId: freezed == shoeId ? _self.shoeId : shoeId // ignore: cast_nullable_to_non_nullable
+as String?,shoeAssignmentModifiedAt: freezed == shoeAssignmentModifiedAt ? _self.shoeAssignmentModifiedAt : shoeAssignmentModifiedAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,
   ));
 }
 
@@ -169,10 +171,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ActivityModel() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion);case _:
+return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
   return orElse();
 
 }
@@ -190,10 +192,10 @@ return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)  $default,) {final _that = this;
 switch (_that) {
 case _ActivityModel():
-return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion);case _:
+return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -210,10 +212,10 @@ return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String type,  double distance,  int movingTime,  int elapsedTime,  double totalElevationGain,  String startDate,  double averageSpeed,  double maxSpeed,  double? averageHeartrate,  double? maxHeartrate,  double? averageCadence,  int? sufferScore,  bool hasHeartrate,  int? workoutType,  double? perceivedExertion,  String? shoeId,  DateTime? shoeAssignmentModifiedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _ActivityModel() when $default != null:
-return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion);case _:
+return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_that.elapsedTime,_that.totalElevationGain,_that.startDate,_that.averageSpeed,_that.maxSpeed,_that.averageHeartrate,_that.maxHeartrate,_that.averageCadence,_that.sufferScore,_that.hasHeartrate,_that.workoutType,_that.perceivedExertion,_that.shoeId,_that.shoeAssignmentModifiedAt);case _:
   return null;
 
 }
@@ -225,7 +227,7 @@ return $default(_that.id,_that.name,_that.type,_that.distance,_that.movingTime,_
 @JsonSerializable()
 
 class _ActivityModel extends ActivityModel {
-  const _ActivityModel({required this.id, required this.name, required this.type, required this.distance, required this.movingTime, required this.elapsedTime, required this.totalElevationGain, required this.startDate, required this.averageSpeed, required this.maxSpeed, this.averageHeartrate, this.maxHeartrate, this.averageCadence, this.sufferScore, this.hasHeartrate = false, this.workoutType, this.perceivedExertion}): super._();
+  const _ActivityModel({required this.id, required this.name, required this.type, required this.distance, required this.movingTime, required this.elapsedTime, required this.totalElevationGain, required this.startDate, required this.averageSpeed, required this.maxSpeed, this.averageHeartrate, this.maxHeartrate, this.averageCadence, this.sufferScore, this.hasHeartrate = false, this.workoutType, this.perceivedExertion, this.shoeId, this.shoeAssignmentModifiedAt}): super._();
   factory _ActivityModel.fromJson(Map<String, dynamic> json) => _$ActivityModelFromJson(json);
 
 @override final  int id;
@@ -245,6 +247,8 @@ class _ActivityModel extends ActivityModel {
 @override@JsonKey() final  bool hasHeartrate;
 @override final  int? workoutType;
 @override final  double? perceivedExertion;
+@override final  String? shoeId;
+@override final  DateTime? shoeAssignmentModifiedAt;
 
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
@@ -259,16 +263,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ActivityModel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.movingTime, movingTime) || other.movingTime == movingTime)&&(identical(other.elapsedTime, elapsedTime) || other.elapsedTime == elapsedTime)&&(identical(other.totalElevationGain, totalElevationGain) || other.totalElevationGain == totalElevationGain)&&(identical(other.startDate, startDate) || other.startDate == startDate)&&(identical(other.averageSpeed, averageSpeed) || other.averageSpeed == averageSpeed)&&(identical(other.maxSpeed, maxSpeed) || other.maxSpeed == maxSpeed)&&(identical(other.averageHeartrate, averageHeartrate) || other.averageHeartrate == averageHeartrate)&&(identical(other.maxHeartrate, maxHeartrate) || other.maxHeartrate == maxHeartrate)&&(identical(other.averageCadence, averageCadence) || other.averageCadence == averageCadence)&&(identical(other.sufferScore, sufferScore) || other.sufferScore == sufferScore)&&(identical(other.hasHeartrate, hasHeartrate) || other.hasHeartrate == hasHeartrate)&&(identical(other.workoutType, workoutType) || other.workoutType == workoutType)&&(identical(other.perceivedExertion, perceivedExertion) || other.perceivedExertion == perceivedExertion));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ActivityModel&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.type, type) || other.type == type)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.movingTime, movingTime) || other.movingTime == movingTime)&&(identical(other.elapsedTime, elapsedTime) || other.elapsedTime == elapsedTime)&&(identical(other.totalElevationGain, totalElevationGain) || other.totalElevationGain == totalElevationGain)&&(identical(other.startDate, startDate) || other.startDate == startDate)&&(identical(other.averageSpeed, averageSpeed) || other.averageSpeed == averageSpeed)&&(identical(other.maxSpeed, maxSpeed) || other.maxSpeed == maxSpeed)&&(identical(other.averageHeartrate, averageHeartrate) || other.averageHeartrate == averageHeartrate)&&(identical(other.maxHeartrate, maxHeartrate) || other.maxHeartrate == maxHeartrate)&&(identical(other.averageCadence, averageCadence) || other.averageCadence == averageCadence)&&(identical(other.sufferScore, sufferScore) || other.sufferScore == sufferScore)&&(identical(other.hasHeartrate, hasHeartrate) || other.hasHeartrate == hasHeartrate)&&(identical(other.workoutType, workoutType) || other.workoutType == workoutType)&&(identical(other.perceivedExertion, perceivedExertion) || other.perceivedExertion == perceivedExertion)&&(identical(other.shoeId, shoeId) || other.shoeId == shoeId)&&(identical(other.shoeAssignmentModifiedAt, shoeAssignmentModifiedAt) || other.shoeAssignmentModifiedAt == shoeAssignmentModifiedAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,type,distance,movingTime,elapsedTime,totalElevationGain,startDate,averageSpeed,maxSpeed,averageHeartrate,maxHeartrate,averageCadence,sufferScore,hasHeartrate,workoutType,perceivedExertion);
+int get hashCode => Object.hashAll([runtimeType,id,name,type,distance,movingTime,elapsedTime,totalElevationGain,startDate,averageSpeed,maxSpeed,averageHeartrate,maxHeartrate,averageCadence,sufferScore,hasHeartrate,workoutType,perceivedExertion,shoeId,shoeAssignmentModifiedAt]);
 
 @override
 String toString() {
-  return 'ActivityModel(id: $id, name: $name, type: $type, distance: $distance, movingTime: $movingTime, elapsedTime: $elapsedTime, totalElevationGain: $totalElevationGain, startDate: $startDate, averageSpeed: $averageSpeed, maxSpeed: $maxSpeed, averageHeartrate: $averageHeartrate, maxHeartrate: $maxHeartrate, averageCadence: $averageCadence, sufferScore: $sufferScore, hasHeartrate: $hasHeartrate, workoutType: $workoutType, perceivedExertion: $perceivedExertion)';
+  return 'ActivityModel(id: $id, name: $name, type: $type, distance: $distance, movingTime: $movingTime, elapsedTime: $elapsedTime, totalElevationGain: $totalElevationGain, startDate: $startDate, averageSpeed: $averageSpeed, maxSpeed: $maxSpeed, averageHeartrate: $averageHeartrate, maxHeartrate: $maxHeartrate, averageCadence: $averageCadence, sufferScore: $sufferScore, hasHeartrate: $hasHeartrate, workoutType: $workoutType, perceivedExertion: $perceivedExertion, shoeId: $shoeId, shoeAssignmentModifiedAt: $shoeAssignmentModifiedAt)';
 }
 
 
@@ -279,7 +283,7 @@ abstract mixin class _$ActivityModelCopyWith<$Res> implements $ActivityModelCopy
   factory _$ActivityModelCopyWith(_ActivityModel value, $Res Function(_ActivityModel) _then) = __$ActivityModelCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion
+ int id, String name, String type, double distance, int movingTime, int elapsedTime, double totalElevationGain, String startDate, double averageSpeed, double maxSpeed, double? averageHeartrate, double? maxHeartrate, double? averageCadence, int? sufferScore, bool hasHeartrate, int? workoutType, double? perceivedExertion, String? shoeId, DateTime? shoeAssignmentModifiedAt
 });
 
 
@@ -296,7 +300,7 @@ class __$ActivityModelCopyWithImpl<$Res>
 
 /// Create a copy of ActivityModel
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? type = null,Object? distance = null,Object? movingTime = null,Object? elapsedTime = null,Object? totalElevationGain = null,Object? startDate = null,Object? averageSpeed = null,Object? maxSpeed = null,Object? averageHeartrate = freezed,Object? maxHeartrate = freezed,Object? averageCadence = freezed,Object? sufferScore = freezed,Object? hasHeartrate = null,Object? workoutType = freezed,Object? perceivedExertion = freezed,Object? shoeId = freezed,Object? shoeAssignmentModifiedAt = freezed,}) {
   return _then(_ActivityModel(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -315,7 +319,9 @@ as double?,sufferScore: freezed == sufferScore ? _self.sufferScore : sufferScore
 as int?,hasHeartrate: null == hasHeartrate ? _self.hasHeartrate : hasHeartrate // ignore: cast_nullable_to_non_nullable
 as bool,workoutType: freezed == workoutType ? _self.workoutType : workoutType // ignore: cast_nullable_to_non_nullable
 as int?,perceivedExertion: freezed == perceivedExertion ? _self.perceivedExertion : perceivedExertion // ignore: cast_nullable_to_non_nullable
-as double?,
+as double?,shoeId: freezed == shoeId ? _self.shoeId : shoeId // ignore: cast_nullable_to_non_nullable
+as String?,shoeAssignmentModifiedAt: freezed == shoeAssignmentModifiedAt ? _self.shoeAssignmentModifiedAt : shoeAssignmentModifiedAt // ignore: cast_nullable_to_non_nullable
+as DateTime?,
   ));
 }
 

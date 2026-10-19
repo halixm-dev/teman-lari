@@ -17,12 +17,14 @@ class ActivityRepositoryImpl implements ActivityRepository {
   final LocalActivityDataSource localDataSource;
   final PreferencesStorage preferencesStorage;
   final TokenStorage? tokenStorage;
+  final bool readLocalOnly;
 
   ActivityRepositoryImpl({
     required this.remoteDataSource,
     required this.localDataSource,
     required this.preferencesStorage,
     this.tokenStorage,
+    this.readLocalOnly = false,
   });
 
   Future<bool> _isAuthenticated() async {
@@ -58,6 +60,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
     final prefs = await preferencesStorage.getPreferences();
     final maxHr = prefs.maxHr ?? 190;
 
+    if (readLocalOnly) {
+      final local = await localDataSource.getAllActivities();
+      return _mapModelsToEntities(local, maxHr: maxHr);
+    }
     final isAuth = await _isAuthenticated();
     if (!isAuth) {
       log(
@@ -78,6 +84,13 @@ class ActivityRepositoryImpl implements ActivityRepository {
       return _mapModelsToEntities(localActivities, maxHr: maxHr);
     }
 
+    return _fetchInitialActivities(monthsBack, maxHr);
+  }
+
+  Future<List<Activity>> _fetchInitialActivities(
+    int monthsBack,
+    int maxHr,
+  ) async {
     // Local store is empty and athlete is authenticated: fetch initial data from remote
     try {
       final remoteActivities = await remoteDataSource.getAllActivities(
@@ -125,6 +138,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         monthsBack: monthsBack,
       );
       await localDataSource.smartMergeActivities(remoteActivities);
+      if (readLocalOnly) await _refreshHeartRateStreams();
     } on UnauthenticatedException catch (e, stack) {
       log(
         'Athlete unauthenticated during refresh',
@@ -168,6 +182,10 @@ class ActivityRepositoryImpl implements ActivityRepository {
       ], maxHr: prefs.maxHr ?? 190).first;
     }
 
+    return _uploadLocalModel(localModel);
+  }
+
+  Future<Activity> _uploadLocalModel(ActivityModel localModel) async {
     try {
       final remoteModel = await remoteDataSource.createActivity(
         name: localModel.name,
@@ -182,9 +200,13 @@ class ActivityRepositoryImpl implements ActivityRepository {
         perceivedExertion:
             localModel.perceivedExertion ?? remoteModel.perceivedExertion,
         workoutType: localModel.workoutType ?? remoteModel.workoutType,
+        shoeId: localModel.shoeAssignmentModifiedAt != null
+            ? localModel.shoeId
+            : localModel.shoeId ?? remoteModel.shoeId,
+        shoeAssignmentModifiedAt: localModel.shoeAssignmentModifiedAt,
       );
 
-      await localDataSource.updateLocalActivityId(localId, mergedModel);
+      await localDataSource.updateLocalActivityId(localModel.id, mergedModel);
 
       final prefs = await preferencesStorage.getPreferences();
       return _mapModelsToEntities([
@@ -236,19 +258,40 @@ class ActivityRepositoryImpl implements ActivityRepository {
           activity.avgHeartRate != null ||
           (hrData != null && hrData.isNotEmpty),
       perceivedExertion: activity.perceivedExertion,
+      shoeId: activity.shoeId,
+      shoeAssignmentModifiedAt: activity.shoeAssignmentModifiedAt,
     );
 
-    await localDataSource.saveActivity(model);
-
-    if (hrData != null && hrData.isNotEmpty) {
-      await localDataSource.saveHeartRateStream(activity.id, hrData);
-    }
+    await localDataSource.coordinator.write(() async {
+      await localDataSource.saveActivity(model);
+      if (hrData != null && hrData.isNotEmpty) {
+        await localDataSource.saveHeartRateStream(activity.id, hrData);
+      }
+    });
   }
 
   @override
-  Future<Map<int, List<double>>> getHeartRateStreams(
-    List<int> activityIds,
-  ) async {
+  Future<Map<int, List<double>>> getHeartRateStreams(List<int> activityIds) =>
+      _loadHeartRateStreams(activityIds, allowRemote: !readLocalOnly);
+
+  Future<void> _refreshHeartRateStreams() async {
+    final activities = await _getLocalActivities();
+    activities.sort(
+      (a, b) =>
+          DateTime.parse(b.startDate).compareTo(DateTime.parse(a.startDate)),
+    );
+    final ids = activities
+        .where((activity) => activity.averageHeartrate != null)
+        .take(50)
+        .map((activity) => activity.id)
+        .toList();
+    await _loadHeartRateStreams(ids, allowRemote: true);
+  }
+
+  Future<Map<int, List<double>>> _loadHeartRateStreams(
+    List<int> activityIds, {
+    required bool allowRemote,
+  }) async {
     if (activityIds.isEmpty) return {};
 
     final cached = await localDataSource.getCachedHeartRateStreams(
@@ -259,7 +302,7 @@ class ActivityRepositoryImpl implements ActivityRepository {
         .where((id) => !result.containsKey(id))
         .toList();
 
-    if (uncached.isEmpty) return result;
+    if (!allowRemote || uncached.isEmpty) return result;
 
     if (!await _isAuthenticated()) {
       return result;
@@ -299,67 +342,77 @@ class ActivityRepositoryImpl implements ActivityRepository {
     List<ActivityModel> models, {
     int maxHr = 190,
   }) {
-    return models.map((model) {
-      final date = DateTime.parse(model.startDate).toLocal();
-      final distanceKm = model.distance / 1000.0;
-      final movingTimeSeconds = model.movingTime;
-      final paceSecondsPerKm =
-          movingTimeSeconds / (distanceKm > 0 ? distanceKm : 1);
+    return models.map((model) => _mapModelToEntity(model, maxHr)).toList();
+  }
 
-      TrainingLoad load;
-      final avgHr = model.averageHeartrate;
-      final rpe = model.perceivedExertion;
-      if (avgHr != null) {
-        final hrPercent = avgHr / maxHr;
-        if (hrPercent < 0.70) {
-          load = TrainingLoad.easy;
-        } else if (hrPercent < 0.80) {
-          load = TrainingLoad.moderate;
-        } else if (hrPercent < 0.90) {
-          load = TrainingLoad.hard;
-        } else {
-          load = TrainingLoad.veryHard;
-        }
-      } else if (rpe != null) {
-        final tss = (model.movingTime / 3600.0) * pow(rpe / 10.0, 2) * 100.0;
-        if (tss < 30) {
-          load = TrainingLoad.easy;
-        } else if (tss < 60) {
-          load = TrainingLoad.moderate;
-        } else if (tss < 90) {
-          load = TrainingLoad.hard;
-        } else {
-          load = TrainingLoad.veryHard;
-        }
-      } else {
+  Activity _mapModelToEntity(ActivityModel model, int maxHr) {
+    final date = DateTime.parse(model.startDate).toLocal();
+    final distanceKm = model.distance / 1000.0;
+    final movingTimeSeconds = model.movingTime;
+    final paceSecondsPerKm =
+        movingTimeSeconds / (distanceKm > 0 ? distanceKm : 1);
+
+    final load = _trainingLoad(model, maxHr);
+
+    final parsedType = switch (model.type) {
+      'Run' => ActivityType.run,
+      'Ride' || 'VirtualRide' => ActivityType.ride,
+      'Swim' => ActivityType.swim,
+      'WeightTraining' || 'Workout' || 'Crossfit' => ActivityType.workout,
+      'Walk' => ActivityType.walk,
+      _ => ActivityType.other,
+    };
+
+    return Activity(
+      id: model.id,
+      name: model.name,
+      date: date,
+      type: parsedType,
+      distanceKm: distanceKm,
+      movingTime: Duration(seconds: movingTimeSeconds),
+      pace: Duration(seconds: paceSecondsPerKm.round()),
+      elevationGainM: model.totalElevationGain,
+      trainingLoad: load,
+      avgHeartRate: model.averageHeartrate,
+      maxHeartRate: model.maxHeartrate,
+      avgCadence: model.averageCadence,
+      sufferScore: model.sufferScore,
+      perceivedExertion: model.perceivedExertion,
+      shoeId: model.shoeId,
+      shoeAssignmentModifiedAt: model.shoeAssignmentModifiedAt,
+    );
+  }
+
+  TrainingLoad _trainingLoad(ActivityModel model, int maxHr) {
+    TrainingLoad load;
+    final avgHr = model.averageHeartrate;
+    final rpe = model.perceivedExertion;
+    if (avgHr != null) {
+      final hrPercent = avgHr / maxHr;
+      if (hrPercent < 0.70) {
+        load = TrainingLoad.easy;
+      } else if (hrPercent < 0.80) {
         load = TrainingLoad.moderate;
+      } else if (hrPercent < 0.90) {
+        load = TrainingLoad.hard;
+      } else {
+        load = TrainingLoad.veryHard;
       }
+    } else if (rpe != null) {
+      final tss = (model.movingTime / 3600.0) * pow(rpe / 10.0, 2) * 100.0;
+      if (tss < 30) {
+        load = TrainingLoad.easy;
+      } else if (tss < 60) {
+        load = TrainingLoad.moderate;
+      } else if (tss < 90) {
+        load = TrainingLoad.hard;
+      } else {
+        load = TrainingLoad.veryHard;
+      }
+    } else {
+      load = TrainingLoad.moderate;
+    }
 
-      final parsedType = switch (model.type) {
-        'Run' => ActivityType.run,
-        'Ride' || 'VirtualRide' => ActivityType.ride,
-        'Swim' => ActivityType.swim,
-        'WeightTraining' || 'Workout' || 'Crossfit' => ActivityType.workout,
-        'Walk' => ActivityType.walk,
-        _ => ActivityType.other,
-      };
-
-      return Activity(
-        id: model.id,
-        name: model.name,
-        date: date,
-        type: parsedType,
-        distanceKm: distanceKm,
-        movingTime: Duration(seconds: movingTimeSeconds),
-        pace: Duration(seconds: paceSecondsPerKm.round()),
-        elevationGainM: model.totalElevationGain,
-        trainingLoad: load,
-        avgHeartRate: model.averageHeartrate,
-        maxHeartRate: model.maxHeartrate,
-        avgCadence: model.averageCadence,
-        sufferScore: model.sufferScore,
-        perceivedExertion: model.perceivedExertion,
-      );
-    }).toList();
+    return load;
   }
 }
