@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:checks/checks.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:teman_lari/core/services/voice_coach_service.dart';
 import 'package:teman_lari/domain/entities/activity.dart';
 import 'package:teman_lari/domain/entities/training_plan.dart';
@@ -12,6 +16,9 @@ import 'package:teman_lari/presentation/widgets/run_session/run_session_state.da
 
 class FakeActivityRepository implements ActivityRepository {
   final List<Activity> activities = [];
+  bool failSave = false;
+  Completer<void>? pendingSave;
+  bool failAfterWrite = false;
 
   @override
   Future<List<Activity>> getAllActivities({int monthsBack = 12}) async {
@@ -35,11 +42,16 @@ class FakeActivityRepository implements ActivityRepository {
 
   @override
   Future<void> saveActivity(Activity activity) async {
+    await pendingSave?.future;
+    if (failSave) throw StateError('Disk write failed');
+    activities.removeWhere((existing) => existing.id == activity.id);
     activities.add(activity);
+    if (failAfterWrite) throw StateError('Flush failed');
   }
 }
 
 class FakeVoiceCoachService implements VoiceCoachService {
+  int completions = 0;
   @override
   Future<void> announcePhaseChange(WorkoutPhase phase) async {}
 
@@ -47,7 +59,9 @@ class FakeVoiceCoachService implements VoiceCoachService {
   Future<void> announceMidpoint() async {}
 
   @override
-  Future<void> announceWorkoutComplete() async {}
+  Future<void> announceWorkoutComplete() async {
+    completions++;
+  }
 
   @override
   void dispose() {}
@@ -84,17 +98,213 @@ void main() {
   Widget buildTestableScreen({
     required TrainingDay day,
     required FakeActivityRepository fakeRepo,
+    FakeVoiceCoachService? voiceCoach,
+    bool routed = false,
   }) {
     return ProviderScope(
       overrides: [
         activityRepositoryProvider.overrideWithValue(fakeRepo),
-        voiceCoachProvider.overrideWithValue(FakeVoiceCoachService()),
+        voiceCoachProvider.overrideWithValue(
+          voiceCoach ?? FakeVoiceCoachService(),
+        ),
       ],
-      child: MaterialApp(home: RunSessionScreen(day: day)),
+      child: routed
+          ? MaterialApp.router(
+              routerConfig: GoRouter(
+                initialLocation: '/dashboard/run',
+                routes: [
+                  GoRoute(
+                    path: '/dashboard',
+                    builder: (_, _) => const Scaffold(body: Text('Dashboard')),
+                    routes: [
+                      GoRoute(
+                        path: 'run',
+                        builder: (_, _) => RunSessionScreen(day: day),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          : MaterialApp(home: RunSessionScreen(day: day)),
     );
   }
 
   group('RunSessionScreen auto-save on completion and exit (Ticket 02)', () {
+    testWidgets('failed completion can be retried without losing the run', (
+      tester,
+    ) async {
+      final repo = FakeActivityRepository()..failSave = true;
+      final day = TrainingDay(
+        date: DateTime(2026, 10, 12),
+        type: WorkoutType.intervals,
+        description: 'Retry save',
+        intervals: const [
+          IntervalPhase(
+            type: IntervalPhaseType.work,
+            duration: Duration(seconds: 1),
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        buildTestableScreen(day: day, fakeRepo: repo, routed: true),
+      );
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      check(
+        find.text('Could not save your run. Tap Retry Save.').evaluate(),
+      ).has((widgets) => widgets.length, 'count').equals(1);
+      check(repo.activities).isEmpty();
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      check(find.byType(RunSessionScreen).evaluate()).isNotEmpty();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      check(find.byType(RunSessionScreen).evaluate()).isNotEmpty();
+
+      repo.failSave = false;
+      await tester.tap(find.text('Retry Save'));
+      await tester.pumpAndSettle();
+      check(repo.activities).length.equals(1);
+      check(repo.activities.single.movingTime.inSeconds).equals(1);
+      check(find.text('Run saved').evaluate()).isNotEmpty();
+      await tester.tap(find.text('Return to Dashboard'));
+      await tester.pumpAndSettle();
+      check(find.text('Dashboard').evaluate()).isNotEmpty();
+    });
+
+    testWidgets('early exit stays on the run when saving fails', (
+      tester,
+    ) async {
+      final repo = FakeActivityRepository()..failSave = true;
+      final day = TrainingDay(
+        date: DateTime(2026, 10, 12),
+        type: WorkoutType.easy,
+        targetMinutes: 10,
+        description: 'Early exit retry',
+      );
+      await tester.pumpWidget(
+        buildTestableScreen(day: day, fakeRepo: repo, routed: true),
+      );
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('End Workout'));
+      await tester.pumpAndSettle();
+      check(find.text('Retry Save').evaluate()).isNotEmpty();
+      check(find.byType(RunSessionScreen).evaluate()).isNotEmpty();
+      repo.failSave = false;
+      await tester.tap(find.text('Retry Save'));
+      await tester.pumpAndSettle();
+      check(repo.activities).length.equals(1);
+    });
+
+    testWidgets('successful early exit returns to the dashboard', (
+      tester,
+    ) async {
+      final repo = FakeActivityRepository();
+      final day = TrainingDay(
+        date: DateTime(2026, 10, 12),
+        type: WorkoutType.easy,
+        targetMinutes: 10,
+        description: 'Early exit',
+      );
+      await tester.pumpWidget(
+        buildTestableScreen(day: day, fakeRepo: repo, routed: true),
+      );
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('End Workout'));
+      await tester.pumpAndSettle();
+      check(repo.activities).length.equals(1);
+      check(find.byType(RunSessionScreen).evaluate()).isEmpty();
+      check(find.text('Dashboard').evaluate()).isNotEmpty();
+    });
+
+    testWidgets(
+      'saving blocks exit and announces completion only after success',
+      (tester) async {
+        final gate = Completer<void>();
+        final repo = FakeActivityRepository()..pendingSave = gate;
+        final voice = FakeVoiceCoachService();
+        final day = TrainingDay(
+          date: DateTime(2026, 10, 12),
+          type: WorkoutType.intervals,
+          description: 'Slow save',
+          intervals: const [
+            IntervalPhase(
+              type: IntervalPhaseType.work,
+              duration: Duration(seconds: 1),
+            ),
+          ],
+        );
+        await tester.pumpWidget(
+          buildTestableScreen(
+            day: day,
+            fakeRepo: repo,
+            voiceCoach: voice,
+            routed: true,
+          ),
+        );
+        await tester.pump();
+        await tester.tap(find.byIcon(Icons.play_arrow));
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        check(find.text('Saving your run…').evaluate()).isNotEmpty();
+        check(voice.completions).equals(0);
+        final button = tester.widget<FilledButton>(
+          find.byKey(const Key('returnToDashboardButton')),
+        );
+        check(button.onPressed).isNull();
+        await tester.tap(find.byIcon(Icons.close));
+        await tester.binding.handlePopRoute();
+        await tester.pump();
+        check(find.byType(RunSessionScreen).evaluate()).isNotEmpty();
+        gate.complete();
+        await tester.pumpAndSettle();
+        check(voice.completions).equals(1);
+        check(repo.activities).length.equals(1);
+        check(find.text('Run saved').evaluate()).isNotEmpty();
+      },
+    );
+
+    testWidgets('retry keeps the same run after an uncertain write', (
+      tester,
+    ) async {
+      final repo = FakeActivityRepository()..failAfterWrite = true;
+      final day = TrainingDay(
+        date: DateTime(2026, 10, 12),
+        type: WorkoutType.intervals,
+        description: 'Flush retry',
+        intervals: const [
+          IntervalPhase(
+            type: IntervalPhaseType.work,
+            duration: Duration(seconds: 1),
+          ),
+        ],
+      );
+      await tester.pumpWidget(buildTestableScreen(day: day, fakeRepo: repo));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.play_arrow));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      final recorded = repo.activities.single;
+      check(find.text('Retry Save').evaluate()).isNotEmpty();
+      repo.failAfterWrite = false;
+      await tester.tap(find.text('Retry Save'));
+      await tester.pumpAndSettle();
+      check(repo.activities).length.equals(1);
+      check(repo.activities.single.id).equals(recorded.id);
+      check(repo.activities.single.date).equals(recorded.date);
+      check(find.text('Run saved').evaluate()).isNotEmpty();
+    });
+
     testWidgets(
       'completing all intervals auto-saves activity to repository with negative timestamp ID and updates activitiesProvider',
       (WidgetTester tester) async {

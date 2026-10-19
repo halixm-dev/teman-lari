@@ -60,6 +60,9 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   WorkoutPhase? _lastPhase;
   bool _midpointAnnounced = false;
   bool _isSaved = false;
+  bool _isSaving = false;
+  bool _saveFailed = false;
+  Activity? _pendingActivity;
 
   static const double _smoothingAlpha = 0.25;
   static const Duration _gpsTimeout = Duration(seconds: 10);
@@ -310,12 +313,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     }
 
     if (newPhase != _lastPhase) {
-      if (newPhase == WorkoutPhase.finished) {
-        HapticFeedback.heavyImpact();
-        if (_state.isAudioCoachOn) {
-          ref.read(voiceCoachProvider).announceWorkoutComplete();
-        }
-      } else {
+      if (newPhase != WorkoutPhase.finished) {
         if (_state.isAudioCoachOn) {
           ref.read(voiceCoachProvider).announcePhaseChange(newPhase);
         }
@@ -387,9 +385,6 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
 
   Future<void> _endWorkout() async {
     _timer?.cancel();
-    if (_state.isAudioCoachOn) {
-      ref.read(voiceCoachProvider).announceWorkoutComplete();
-    }
     setState(() {
       _state = RunSessionState(
         plan: _state.plan,
@@ -407,9 +402,35 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   }
 
   Future<void> _saveWorkout() async {
-    if (_isSaved) return;
-    _isSaved = true;
+    if (_isSaved || _isSaving) return;
+    final activity = _pendingActivity ??= _recordWorkout();
+    setState(() {
+      _isSaving = true;
+      _saveFailed = false;
+    });
+    try {
+      await ref.read(activitiesProvider.notifier).saveCompletedRun(activity);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _saveFailed = true;
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _isSaving = false;
+      _isSaved = true;
+    });
+    HapticFeedback.heavyImpact();
+    if (_state.isAudioCoachOn) {
+      ref.read(voiceCoachProvider).announceWorkoutComplete();
+    }
+  }
 
+  Activity _recordWorkout() {
     final paceSec = _state.distanceKm > 0
         ? (_state.elapsedSeconds / _state.distanceKm).round()
         : (_state.currentPaceSecondsPerKm ?? 300);
@@ -421,7 +442,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
     final label = typeLabel(_state.plan.type);
     final name = label.endsWith('Run') ? label : '$label Run';
 
-    final activity = Activity(
+    return Activity(
       id: -DateTime.now().millisecondsSinceEpoch,
       name: name,
       date: DateTime.now(),
@@ -434,15 +455,10 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
       avgCadence: avgCadence,
       isLocal: true,
     );
-
-    try {
-      await ref.read(activitiesProvider.notifier).saveCompletedRun(activity);
-    } catch (_) {
-      // Local save failure should not crash the session screen
-    }
   }
 
   void _exitToDashboard() {
+    if (!_isSaved) return;
     try {
       if (GoRouter.maybeOf(context) != null) {
         if (context.canPop()) {
@@ -461,7 +477,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
+      canPop: _isSaved,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           if (_state.phase == WorkoutPhase.finished) {
@@ -577,18 +593,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  child: FilledButton.icon(
-                    key: const Key('returnToDashboardButton'),
-                    onPressed: _exitToDashboard,
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Return to Dashboard'),
-                  ),
-                ),
+                _buildSaveActions(),
               ] else
                 Expanded(
                   child: RunTimerDisplay(
@@ -668,18 +673,7 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: FilledButton.icon(
-              key: const Key('returnToDashboardButton'),
-              onPressed: _exitToDashboard,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Return to Dashboard'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-            ),
-          ),
+          _buildSaveActions(),
         ] else ...[
           RunPacerDisplay(
             currentPaceSecondsPerKm: _state.currentPaceSecondsPerKm,
@@ -741,6 +735,60 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
       return phaseLabelFromType(_state.segments[idx].type);
     }
     return null;
+  }
+
+  Widget _buildSaveActions() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _isSaved
+                  ? 'Run saved'
+                  : _saveFailed
+                  ? 'Could not save your run. Tap Retry Save.'
+                  : 'Saving your run…',
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildSaveButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: 240,
+      child: FilledButton.icon(
+        key: Key(_saveFailed ? 'retrySaveButton' : 'returnToDashboardButton'),
+        style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+        onPressed: _isSaving
+            ? null
+            : _saveFailed
+            ? _saveWorkout
+            : _isSaved
+            ? _exitToDashboard
+            : null,
+        icon: _isSaving
+            ? null
+            : Icon(_saveFailed ? Icons.refresh : Icons.arrow_back),
+        label: _isSaving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  semanticsLabel: 'Saving your run',
+                ),
+              )
+            : Text(_saveFailed ? 'Retry Save' : 'Return to Dashboard'),
+      ),
+    );
   }
 
   void _showExitSheet(BuildContext context) {
@@ -847,7 +895,6 @@ class _RunSessionScreenState extends ConsumerState<RunSessionScreen> {
                             Expanded(
                               child: FilledButton(
                                 onPressed: () async {
-                                  HapticFeedback.heavyImpact();
                                   Navigator.of(sheetContext).pop();
                                   await _endWorkout();
                                   if (mounted) {
