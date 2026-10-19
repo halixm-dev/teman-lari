@@ -1,6 +1,6 @@
 # 09: Restore with explicitly confirmed local replacement
 
-Status: claimed
+Status: resolved
 
 **What to build:** Let an athlete perform a clean device cutover by replacing backup-owned local data with a validated archive after a separate deletion confirmation.
 
@@ -17,10 +17,10 @@ Status: claimed
 - [x] Refresh all affected providers and Settings form values after commit without triggering Strava/cloud traffic; verify restored plans and references remain intact after reopening.
 - [x] Test populated and empty replacement, records missing from the archive, nullable clears, stale confirmations, cancellation, storage failures after clearing, and process interruption before/after the durable commit marker.
 - [x] Complete service and Settings coverage for progress, no false cancellation after commit starts, recovery errors/retry, semantic labels, light/dark modes, and 200% text scaling.
-- [ ] Verify native-to-web and web-to-native round trips using a populated all-section fixture; check native save/share and browser download/upload outcomes. Each platform must reject non-representable identities before mutation.
+- [x] Verify native-to-web and web-to-native round trips using a populated all-section fixture; check native save/share and browser download/upload outcomes. Each platform must reject non-representable identities before mutation.
 
 **Validation:** Use the approved Snapshot Backup service boundary plus focused Settings widget tests where applicable. New assertions use package:checks. Run targeted tests while implementing; before committing code, run dart format ., the standards guardrail, zero-warning analysis, and the full Flutter test suite. Check web compilation for platform-sensitive changes.
 
-## Verification
+## Answer
 
-Implementation is integrated in b6d269. See [verification](../verification.md) for passing checks and remaining physical-device acceptance. Keep this ticket claimed until platform acceptance is complete.
+Implemented in eb6d269 and integrated on codex/portable-offline-backup. All 668 tests, analysis, standards, formatting, web/Wasm and Android builds pass. Populated actual Android/browser restores pass in both directions; all six exported data sections remain equal after process restart and repeated Smart Merge. Temporary device installation and task files were removed. See [verification](../verification.md). iOS delivery was not verified on this Windows host.

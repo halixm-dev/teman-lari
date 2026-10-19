@@ -1,6 +1,6 @@
 # Spec: Portable Offline Backup Archive and Smart Merge
 
-Status: claimed
+Status: resolved
 
 Source: ADR 0011, with shared snapshot requirements from ADR 0010.
 
@@ -182,3 +182,7 @@ Import validates the entire archive and shows its creation time, contents, and e
 - The user confirmed the testing boundary: one Snapshot Backup service covering export, merge, replacement, and recovery, plus focused Settings widget tests.
 - Implement in dependency order: durable record coverage and modification tracking; shared codec and strict snapshot access; deterministic preview/merge; recoverable apply and startup recovery; platform file transport and Settings; then platform and interruption verification. This spec creates no separate implementation tickets.
 - Feature acceptance requires truthful complete coverage. Do not ship a successful-looking backup that drops unsupported nonempty plan, equipment, or feedback data, and do not mark a restore successful before durability is established.
+
+## Answer
+
+All nine implementation tickets are resolved on codex/portable-offline-backup. See [verification](verification.md) for test evidence, Android/web round trips, and the iOS validation limitation. No cloud transport, push, or pull request was added.

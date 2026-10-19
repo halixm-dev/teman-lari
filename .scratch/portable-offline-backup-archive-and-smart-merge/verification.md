@@ -22,9 +22,12 @@ Updated: 2026-10-19
 | Cancellation | Cancelling deletion and preview leaves all six exported data sections unchanged |
 | Empty replacement | Completed offline; all five profile values null, other section counts zero, plan/configuration/cycle state null or empty |
 | Settings accessibility | Focused widget coverage includes both themes and real 200% text scaling above Navigator |
-| Latest Android APK on physical phone | Pending: ADB reports no connected devices |
-| Final populated phone-to-browser and browser-to-phone UI restore | Pending connected phone; use separate fresh installation |
-| iOS delivery | Pending an iOS-capable host/device |
+| Latest Android APK on physical phone | Passed on Redmi Note 9 Pro, Android API 35; fresh separate installation |
+| Browser-to-phone restore | Actual browser export selected through Android picker; deletion cancelled and renewed, then replacement completed; native save produced identical six data sections |
+| Native process restart and Smart Merge | Restored profile/workout and section counts persisted; repeated merge matched two activities and added zero; re-export preserved all six sections exactly |
+| Phone-to-browser restore | Actual native export selected and restored in isolated browser while offline; completed browser download preserved all six sections exactly |
+| Device cleanup | Removed the verified fresh installation and only this session's fixture/export/UI files; browser and local server stopped |
+| iOS delivery | Not verified: this Windows host has no iOS device/runtime |
 
 ## Review
 
@@ -33,7 +36,7 @@ Both review axes were performed directly by the primary agent, honoring the user
 | Axis | Result |
 | --- | --- |
 | Standards | No remaining code findings after fixes for profile-field normalization/counting and actual dialog text scaling. Formatting, guardrail and analyzer pass. |
-| Spec | Implemented service, storage, merge, replacement, recovery and Settings behavior is covered. Platform acceptance remains incomplete until the pending device checks above. |
+| Spec | Service, storage, merge, replacement, recovery and Settings behavior is covered. Populated Android/browser round trips pass in both directions. iOS delivery remains unverified. |
 
 ## Evidence and safe continuation
 
@@ -43,4 +46,4 @@ APK SHA-256: `8D9517B401E3D75A09A576B9A0068D0F1A75F3F6CAC5A544C8E5E23A189F8451`.
 
 For phone testing, recheck that `dev.halixm.temanlari` is absent immediately before installing, and install without `-r`. Never replace or clear the athlete's existing `dev.halixm.temanlari.dev` installation. Only remove the fresh task installation and explicitly recorded task files afterward. The phone's existing backup remains untouched.
 
-Tickets 01–08 are resolved. Ticket 09 and the parent spec remain open for the pending platform acceptance checks. No push or pull request was requested.
+All nine tickets and the parent spec are resolved for the implemented Android/web feature. iOS delivery is an explicit validation limitation. No push or pull request was requested.
