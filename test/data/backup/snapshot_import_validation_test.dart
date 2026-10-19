@@ -136,13 +136,23 @@ void main() {
     });
   }
   test(
-    'unknown optional metadata and escaped brackets survive preview',
+    'unknown optional metadata and escaped brackets survive preview and replacement',
     () async {
       archive['optional'] = {'future': r'[[[[[\"}}}}}' * 80};
       (archive['data'] as Map)['profile']['optional'] = 'ignored';
-      check(
-        (await service.prepareImport(bytes(archive))).archive.snapshotId,
-      ).equals('fixture');
+      for (final name in ['Guest', null]) {
+        ((archive['data'] as Map)['profile']['athlete_name'] as Map)['value'] =
+            name;
+        final preview = await service.prepareImport(bytes(archive));
+        check(preview.archive.snapshotId).equals('fixture');
+        check(preview.archiveJson.containsKey('optional')).isTrue();
+        await service.applyImport(preview, mode: BackupImportMode.replaceAll);
+        final state = await service.readLocalState();
+        check(
+          state.stores['preferences']?.containsKey('optional'),
+        ).equals(false);
+        check(state.stores['preferences']?['athlete_name']).equals(name);
+      }
     },
   );
   test('unknown required section cannot silently disappear', () async {

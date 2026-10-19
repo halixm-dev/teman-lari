@@ -16,6 +16,7 @@ class BackupImportPreview {
   final String _archiveJson;
   final int localRevision;
   final BackupImportSummary summary;
+  final BackupImportSummary replacementSummary;
   final String? mergeError;
   final String snapshotId;
   final DateTime createdAt;
@@ -28,6 +29,7 @@ class BackupImportPreview {
     required Map<String, dynamic> archiveJson,
     required this.localRevision,
     this.summary = const BackupImportSummary(),
+    this.replacementSummary = const BackupImportSummary(),
     this.mergeError,
     required Map<String, int> localCounts,
   }) : _archiveJson = jsonEncode(archiveJson),

@@ -33,7 +33,12 @@ void main() {
           'test/fixtures/offline-backup-v1-populated.tlbackup',
     ).readAsBytes();
     final preview = await service.prepareImport(Uint8List.fromList(bytes));
-    await service.applyImport(preview);
+    await service.applyImport(
+      preview,
+      mode: Platform.environment['BACKUP_IMPORT_MODE'] == 'replace'
+          ? BackupImportMode.replaceAll
+          : BackupImportMode.smartMerge,
+    );
     fail('Process interruption was not triggered');
   });
 }

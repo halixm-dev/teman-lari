@@ -14,6 +14,7 @@ class BackupImportSummary {
   final int updatedFeedback;
   final int changedAssignments;
   final List<String> warnings;
+  final bool replacedAllData;
   const BackupImportSummary({
     this.addedActivities = 0,
     this.matchedActivities = 0,
@@ -29,5 +30,6 @@ class BackupImportSummary {
     this.changedAssignments = 0,
     this.changedTrainingPlan = false,
     this.warnings = const [],
+    this.replacedAllData = false,
   });
 }

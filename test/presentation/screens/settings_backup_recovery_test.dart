@@ -121,6 +121,57 @@ void main() {
       });
     },
   );
+  testWidgets(
+    'replacement refresh shows the complete restored state without network calls or new edits',
+    (tester) async {
+      await tester.runAsync(() async {
+        var requests = 0;
+        final tokens = MemoryTokens();
+        final client = MockClient((_) async {
+          requests++;
+          throw StateError('Unexpected network');
+        });
+        await service.initialize();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              snapshotBackupServiceProvider.overrideWithValue(service),
+              preferencesStorageProvider.overrideWithValue(
+                PreferencesStorage(coordinator: service.coordinator),
+              ),
+              localActivityDataSourceProvider.overrideWithValue(
+                LocalActivityDataSource(coordinator: service.coordinator),
+              ),
+              tokenStorageProvider.overrideWithValue(tokens),
+              httpClientProvider.overrideWithValue(client),
+            ],
+            child: const MaterialApp(home: RefreshSettingsHost()),
+          ),
+        );
+        await settleRealWork(tester);
+        final bytes = await File(
+          'test/fixtures/offline-backup-v1-populated.tlbackup',
+        ).readAsBytes();
+        await service.applyImport(
+          await service.prepareImport(bytes),
+          mode: BackupImportMode.replaceAll,
+        );
+        final beforeRefresh = await service.readLocalState();
+        await tester.tap(find.byKey(const ValueKey('refresh-local-backup')));
+        await settleRealWork(tester);
+        check(find.text('Portable Runner').evaluate().length).equals(1);
+        check((await service.readBackupCounts())['training_plans']).equals(1);
+        check(find.text('Analysis ready').evaluate().length).equals(1);
+        check(
+          (await service.readLocalState()).encode(),
+        ).equals(beforeRefresh.encode());
+        check(requests).equals(0);
+        check(tokens.saves).equals(0);
+        check(tokens.value.accessToken).equals('original');
+      });
+    },
+  );
+
   testWidgets('explicit Settings sync downloads missing heart rate samples', (
     tester,
   ) async {

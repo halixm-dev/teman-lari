@@ -100,7 +100,9 @@ class _BackupCardState extends ConsumerState<BackupCard> {
       refreshLocalBackupProviders(ref);
       setState(() {
         _summary = summary;
-        _message = 'Smart Merge complete.';
+        _message = summary.replacedAllData
+            ? 'Replacement complete.'
+            : 'Smart Merge complete.';
       });
     } else if (!chooseAgain) {
       setState(

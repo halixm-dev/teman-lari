@@ -1,6 +1,6 @@
 # 09: Restore with explicitly confirmed local replacement
 
-Status: ready-for-agent
+Status: claimed
 
 **What to build:** Let an athlete perform a clean device cutover by replacing backup-owned local data with a validated archive after a separate deletion confirmation.
 

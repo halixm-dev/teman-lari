@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'backup_replacement_confirmation.dart';
 
 import '../../../data/backup/snapshot_backup_service.dart';
 
 class BackupImportPreviewDialog extends StatefulWidget {
   final BackupImportPreview preview;
-  final Future<BackupImportSummary> Function(BackupImportPreview) onApply;
+  final Future<BackupImportSummary> Function(
+    BackupImportPreview, {
+    BackupImportMode mode,
+  })
+  onApply;
   final VoidCallback onChooseFile;
   const BackupImportPreviewDialog({
     super.key,
@@ -20,6 +25,11 @@ class BackupImportPreviewDialog extends StatefulWidget {
 class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
   late BackupImportPreview _preview;
   bool _applying = false;
+  bool _confirming = false;
+  BackupImportMode _mode = BackupImportMode.smartMerge;
+  bool get _busy => _applying || _confirming;
+  bool get _blocked =>
+      _mode == BackupImportMode.smartMerge && _preview.mergeError != null;
   String? _error;
 
   @override
@@ -29,14 +39,18 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
   }
 
   Future<void> _apply() async {
-    if (_applying || _preview.mergeError != null) return;
+    if (_busy || _blocked) return;
+    if (_mode == BackupImportMode.replaceAll && !await _confirmReplacement()) {
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _applying = true;
       _error = null;
     });
     var applied = false;
     try {
-      final summary = await widget.onApply(_preview);
+      final summary = await widget.onApply(_preview, mode: _mode);
       applied = true;
       if (mounted) Navigator.pop(context, summary);
     } on SnapshotImportPreviewStale catch (error) {
@@ -53,9 +67,23 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
     }
   }
 
+  Future<bool> _confirmReplacement() async {
+    setState(() => _confirming = true);
+    try {
+      return await showDialog<bool>(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => const BackupReplacementConfirmation(),
+          ) ??
+          false;
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
-    canPop: !_applying,
+    canPop: !_busy,
     child: AlertDialog(
       title: const Text('Backup preview'),
       semanticLabel: 'Backup preview',
@@ -69,12 +97,12 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
 
   List<Widget> _actions() => [
     TextButton(
-      onPressed: _applying ? null : () => Navigator.pop(context),
+      onPressed: _busy ? null : () => Navigator.pop(context),
       child: const Text('Cancel'),
     ),
-    if (_error != null || _preview.mergeError != null)
+    if (_error != null || _blocked)
       TextButton(
-        onPressed: _applying
+        onPressed: _busy
             ? null
             : () {
                 widget.onChooseFile();
@@ -83,8 +111,12 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
         child: const Text('Choose another file'),
       ),
     FilledButton(
-      onPressed: _applying || _preview.mergeError != null ? null : _apply,
-      child: const Text('Import with Smart Merge'),
+      onPressed: _busy || _blocked ? null : _apply,
+      child: Text(
+        _mode == BackupImportMode.smartMerge
+            ? 'Import with Smart Merge'
+            : 'Review replacement',
+      ),
     ),
   ];
 
@@ -101,8 +133,12 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
       const SizedBox(height: 16),
       _modes(),
       const SizedBox(height: 12),
-      BackupImportSummaryView(summary: _preview.summary),
-      if (_preview.mergeError case final message?) _notice(message),
+      BackupImportSummaryView(
+        summary: _mode == BackupImportMode.smartMerge
+            ? _preview.summary
+            : _preview.replacementSummary,
+      ),
+      if (_blocked) _notice(_preview.mergeError ?? ''),
       if (_error case final message?) _notice(message),
       if (_applying) ...[
         const SizedBox(height: 12),
@@ -118,24 +154,32 @@ class _BackupImportPreviewDialogState extends State<BackupImportPreviewDialog> {
   );
 
   Widget _modes() => RadioGroup<BackupImportMode>(
-    groupValue: BackupImportMode.smartMerge,
-    onChanged: (_) {},
+    groupValue: _mode,
+    onChanged: (mode) {
+      if (_busy || mode == null) return;
+      setState(() {
+        _mode = mode;
+        _error = null;
+      });
+    },
     child: Column(
       children: [
         RadioListTile<BackupImportMode>(
           value: BackupImportMode.smartMerge,
-          enabled: !_applying,
+          enabled: !_busy,
           title: const Text('Smart Merge'),
           subtitle: const Text(
             'Keep unrelated local data. Add missing records and preserve local values.',
           ),
           contentPadding: EdgeInsets.zero,
         ),
-        const RadioListTile<BackupImportMode>(
+        RadioListTile<BackupImportMode>(
           value: BackupImportMode.replaceAll,
-          enabled: false,
-          title: Text('Replace All Local Data'),
-          subtitle: Text('Replace the backup-owned local data with this file.'),
+          enabled: !_busy,
+          title: const Text('Replace All Local Data'),
+          subtitle: const Text(
+            'Replace the backup-owned local data with this file.',
+          ),
           contentPadding: EdgeInsets.zero,
         ),
       ],
@@ -158,20 +202,28 @@ class BackupImportSummaryView extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text('Activities added: ${summary.addedActivities}'),
-      Text('Activities matched: ${summary.matchedActivities}'),
-      Text('Workouts matched by details: ${summary.signatureMatches}'),
-      Text('Workout IDs updated: ${summary.canonicalIdentityChanges}'),
-      Text('Uncertain groups kept separate: ${summary.ambiguousSignatures}'),
-      Text('Local values kept: ${summary.retainedConflicts}'),
+      Text(
+        '${summary.replacedAllData ? 'Activities restored' : 'Activities added'}: ${summary.addedActivities}',
+      ),
+      if (!summary.replacedAllData) ...[
+        Text('Activities matched: ${summary.matchedActivities}'),
+        Text('Workouts matched by details: ${summary.signatureMatches}'),
+        Text('Workout IDs updated: ${summary.canonicalIdentityChanges}'),
+        Text('Uncertain groups kept separate: ${summary.ambiguousSignatures}'),
+        Text('Local values kept: ${summary.retainedConflicts}'),
+      ],
       Text('Profile fields changed: ${summary.changedPreferences}'),
       Text(
         'Training plan changed: ${summary.changedTrainingPlan ? 'Yes' : 'No'}',
       ),
-      Text('Shoes added: ${summary.addedShoes}'),
+      Text(
+        '${summary.replacedAllData ? 'Shoes restored' : 'Shoes added'}: ${summary.addedShoes}',
+      ),
       Text('Shoes updated: ${summary.updatedShoes}'),
       Text('Shoe assignments changed: ${summary.changedAssignments}'),
-      Text('Rehab records added: ${summary.addedFeedback}'),
+      Text(
+        '${summary.replacedAllData ? 'Rehab records restored' : 'Rehab records added'}: ${summary.addedFeedback}',
+      ),
       Text('Rehab records updated: ${summary.updatedFeedback}'),
       for (final warning in summary.warnings) Text(warning),
     ],

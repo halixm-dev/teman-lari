@@ -5,6 +5,7 @@ import 'import_preview.dart';
 import 'import_summary.dart';
 import 'training_plan_persistence.dart';
 import 'snapshot_smart_merge.dart';
+import 'snapshot_replacement.dart';
 import 'archive/snapshot_archive_validator.dart';
 
 import 'archive/snapshot_archive_codec.dart';
@@ -214,24 +215,26 @@ class SnapshotBackupService {
     }
   }
 
-  Future<BackupImportSummary> applyImport(BackupImportPreview preview) =>
-      coordinator.snapshot(() async {
-        importPhase.value = BackupImportPhase.applying;
-        try {
-          final local = await _read();
-          final bytes = Uint8List.fromList(utf8.encode(preview.archiveBinding));
-          if (preview.localRevision != local.revision) {
-            final refreshed = await compute(_decodeImport, (bytes, local));
-            throw SnapshotImportPreviewStale(refreshed);
-          }
-          final plan = await compute(_planImport, (bytes, local));
-          await _applyState(plan.state, preview.localRevision);
-          resetTrainingPlanBaseline();
-          return plan.summary;
-        } finally {
-          importPhase.value = BackupImportPhase.idle;
-        }
-      });
+  Future<BackupImportSummary> applyImport(
+    BackupImportPreview preview, {
+    BackupImportMode mode = BackupImportMode.smartMerge,
+  }) => coordinator.snapshot(() async {
+    importPhase.value = BackupImportPhase.applying;
+    try {
+      final local = await _read();
+      final bytes = Uint8List.fromList(utf8.encode(preview.archiveBinding));
+      if (preview.localRevision != local.revision) {
+        final refreshed = await compute(_decodeImport, (bytes, local));
+        throw SnapshotImportPreviewStale(refreshed);
+      }
+      final plan = await compute(_planImport, (bytes, local, mode));
+      await _applyState(plan.state, preview.localRevision);
+      resetTrainingPlanBaseline();
+      return plan.summary;
+    } finally {
+      importPhase.value = BackupImportPhase.idle;
+    }
+  });
   static String _newSnapshotId() {
     final random = Random.secure();
     return base64Url
@@ -477,9 +480,17 @@ BackupImportPreview _decodeImport((Uint8List, LocalSnapshot) input) {
     localRevision: input.$2.revision,
     localCounts: const SnapshotArchiveCodec().counts(input.$2),
     summary: summary,
+    replacementSummary: summarizeReplacement(archive, input.$2),
     mergeError: mergeError,
   );
 }
 
-SnapshotMergePlan _planImport((Uint8List, LocalSnapshot) input) =>
-    planSmartMerge(validateSnapshotArchive(input.$1), input.$2);
+SnapshotMergePlan _planImport(
+  (Uint8List, LocalSnapshot, BackupImportMode) input,
+) {
+  final archive = validateSnapshotArchive(input.$1);
+  return switch (input.$3) {
+    BackupImportMode.smartMerge => planSmartMerge(archive, input.$2),
+    BackupImportMode.replaceAll => planReplacement(archive, input.$2),
+  };
+}
