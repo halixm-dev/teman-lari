@@ -1,6 +1,6 @@
 # Spec: Portable Offline Backup Archive and Smart Merge
 
-Status: ready-for-agent
+Status: claimed
 
 Source: ADR 0011, with shared snapshot requirements from ADR 0010.
 
