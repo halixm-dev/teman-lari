@@ -42,6 +42,8 @@ Both review axes were performed directly by the primary agent, honoring the user
 
 Ignored local evidence is preserved at `build/backup-qa-evidence/`; the final APK is `build/app/outputs/flutter-apk/app-prod-debug.apk`.
 
+The temporary build cache is retained under ignored `build/backup-working-cache/`. The task-created, stopped emulator and its registry entry were removed. Managed worktree archival was requested through the app; its asynchronous requests returned queued. The main workspace has no tracked changes; the athlete's pre-existing offline-first scratch directory is untouched.
+
 APK SHA-256: `8D9517B401E3D75A09A576B9A0068D0F1A75F3F6CAC5A544C8E5E23A189F8451`.
 
 For phone testing, recheck that `dev.halixm.temanlari` is absent immediately before installing, and install without `-r`. Never replace or clear the athlete's existing `dev.halixm.temanlari.dev` installation. Only remove the fresh task installation and explicitly recorded task files afterward. The phone's existing backup remains untouched.
